@@ -1,0 +1,29 @@
+# runtime
+data/
+*.log
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+backend/dist/
+
+# node
+node_modules/
+extension/dist/
+*.tsbuildinfo
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# not published: internal working notes, design drafts, recorded samples (contain the recording account's data)
+CLAUDE.md
+docs/design.md
+docs/ui-proposal.*
+backend/tests/fixtures/
+.claude/

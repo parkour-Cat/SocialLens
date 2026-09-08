@@ -1,0 +1,915 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SocialLens 控制台</title>
+<style>
+  :root {
+    --bg: #F2F5F7; --surface: #FFFFFF; --surface-2: #E9EEF1; --line: #D5DDE3; --line-strong: #B9C4CC;
+    --ink: #17232B; --ink-2: #4B5B66; --ink-3: #7C8A94;
+    --accent: #0E7C86; --accent-ink: #FFFFFF; --accent-soft: #D9EFF1;
+    --ok: #1B7F4B; --ok-soft: #DCEFE3; --warn: #A6600C; --warn-soft: #F8E9D2; --bad: #B3261E; --bad-soft: #F6DAD8;
+    --shadow: 0 12px 32px rgba(23, 35, 43, 0.12);
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Cascadia Mono", monospace;
+    --sans: "IBM Plex Sans", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1519; --surface: #171E24; --surface-2: #1F2830; --line: #2B3640; --line-strong: #3C4955;
+      --ink: #E4EAEE; --ink-2: #A9B6BF; --ink-3: #7A8791;
+      --accent: #3FB5BF; --accent-ink: #0B1518; --accent-soft: #163A3E;
+      --ok: #5CC489; --ok-soft: #173525; --warn: #E0A458; --warn-soft: #3A2A12; --bad: #F08A83; --bad-soft: #3E1E1C;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1519; --surface: #171E24; --surface-2: #1F2830; --line: #2B3640; --line-strong: #3C4955;
+    --ink: #E4EAEE; --ink-2: #A9B6BF; --ink-3: #7A8791;
+    --accent: #3FB5BF; --accent-ink: #0B1518; --accent-soft: #163A3E;
+    --ok: #5CC489; --ok-soft: #173525; --warn: #E0A458; --warn-soft: #3A2A12; --bad: #F08A83; --bad-soft: #3E1E1C;
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.55 var(--sans); }
+  a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+  button { font: inherit; color: inherit; }
+  .app { display: grid; grid-template-columns: 200px 1fr; min-height: 100vh; }
+  .side { background: var(--surface-2); border-right: 1px solid var(--line); padding: 16px 10px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 4px 8px 16px; font-weight: 600; font-size: 15px; }
+  .logo { width: 22px; height: 22px; border-radius: 6px; background: var(--accent); position: relative; flex: none; }
+  .logo::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; border: 2px solid var(--accent-ink); }
+  .nav { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; border-radius: 6px; color: var(--ink-2); background: none; border: 0; text-align: left; cursor: pointer; width: 100%; }
+  .nav:hover { color: var(--ink); }
+  .nav.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+  .nav .cnt { font: 11px var(--mono); color: var(--ink-3); }
+  .side .bottom { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid var(--line); display: grid; gap: 6px; font-size: 12px; color: var(--ink-2); }
+  .side .bottom code { font: 11px var(--mono); color: var(--ink-3); }
+  .content { padding: 18px 24px 40px; display: grid; gap: 16px; align-content: start; min-width: 0; }
+  .topbar { display: flex; align-items: center; gap: 14px; }
+  .topbar h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  .omni { margin-left: auto; width: min(460px, 50%); display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); }
+  .omni input { flex: 1; border: 0; background: none; color: var(--ink); font: inherit; outline: none; min-width: 0; }
+  .omni input::placeholder { color: var(--ink-3); }
+  .omni:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  section.page { display: none; } section.page.on { display: grid; gap: 16px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; background: var(--ink-3); flex: none; }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 500; line-height: 1.6; white-space: nowrap; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); } .pill.bad { background: var(--bad-soft); color: var(--bad); } .pill.warn { background: var(--warn-soft); color: var(--warn); } .pill.neutral { background: var(--surface-2); color: var(--ink-2); } .pill.accent { background: var(--accent-soft); color: var(--accent); }
+  .mono { font-family: var(--mono); font-size: 12px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--ink-3); } .sub { color: var(--ink-3); font-size: 12px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.ghost { border-color: transparent; color: var(--accent); background: none; padding: 2px 6px; }
+  .btn.ghost:hover { background: var(--accent-soft); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn:focus-visible, .nav:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .plogo { width: 22px; height: 22px; border-radius: 6px; flex: none; display: inline-grid; place-items: center; color: #fff; font: 600 11px var(--sans); overflow: hidden; position: relative; vertical-align: middle; }
+  .plogo img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; background: #fff; }
+  .plogo.sm { width: 18px; height: 18px; font-size: 9px; border-radius: 5px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .tile { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--surface); display: grid; gap: 7px; cursor: pointer; }
+  .tile:hover { border-color: var(--accent); }
+  .tile .n { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .tile .n .pill { margin-left: auto; }
+  .meter { height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
+  .meter i.warn { background: var(--warn); } .meter i.bad { background: var(--bad); }
+  .tile .m { font-size: 12px; color: var(--ink-3); display: flex; justify-content: space-between; gap: 8px; }
+  .cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+  .panel { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-width: 0; }
+  .panel .ph { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-weight: 600; flex-wrap: wrap; }
+  .panel .ph span { font-weight: 400; color: var(--ink-3); font-size: 12px; }
+  .row { display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row .t { font: 12px var(--mono); color: var(--ink-3); }
+  .empty { padding: 14px 12px; color: var(--ink-3); font-size: 13px; }
+  .dl { padding: 8px 12px; display: grid; gap: 6px; border-top: 1px solid var(--line); min-width: 0; }
+  .dl > div { min-width: 0; }
+  .dl .err { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--bad); }
+  .dl .sub > span { min-width: 0; white-space: nowrap; }
+  .dl .sub > span:first-child { flex: none; }
+  .dl .sub > span.mono { overflow: hidden; text-overflow: ellipsis; }
+  .dl:first-child { border-top: 0; }
+  .dl .meter { height: 6px; border-radius: 3px; }
+  .bench { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 16px; align-items: start; }
+  .form { display: grid; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); position: sticky; top: 16px; }
+  .form label { display: grid; gap: 4px; font-size: 12px; color: var(--ink-3); }
+  .form label[hidden], [hidden] { display: none !important; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; color: var(--ink-2); background: var(--surface); cursor: pointer; }
+  .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .chip.off { opacity: .55; }
+  .field, select.field { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; width: 100%; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; }
+  .seg button { padding: 5px; text-align: center; font-size: 12px; color: var(--ink-2); background: none; border: 0; cursor: pointer; }
+  .seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .seg button:disabled { opacity: .4; cursor: default; }
+  .results { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; min-width: 0; }
+  .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
+  .toolbar .sp { flex: 1; }
+  .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  .toolbar .ctx { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-weight: 500; }
+  .toolbar .ctx:empty { display: none; }
+  .stale { padding: 6px 12px; background: var(--warn-soft); color: var(--warn); font-size: 12px; border-bottom: 1px solid var(--line); }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 12px; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.num, th.num { text-align: right; }
+  tr.sel td { background: var(--accent-soft); }
+  tbody tr { cursor: pointer; } tbody tr:hover td { background: var(--surface-2); } tbody tr.sel:hover td { background: var(--accent-soft); }
+  .thumb { width: 64px; height: 42px; border-radius: 4px; background: var(--surface-2); object-fit: cover; display: block; }
+  .thumb.empty { background: transparent; }
+  #q-results td:nth-child(2), #c-results td:nth-child(2) { max-width: 560px; overflow-wrap: anywhere; }
+  .thread { padding: 4px 0; }
+  .cmt { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line); }
+  .cmt:first-child { border-top: 0; }
+  .cmt .av { width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); object-fit: cover; display: block; }
+  .cmt .av.ph { display: grid; place-items: center; font-size: 12px; color: var(--ink-3); }
+  .cmt .who { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .cmt .who .n { font-weight: 600; }
+  .cmt .who .t { color: var(--ink-3); font-size: 12px; }
+  .cmt .txt { white-space: pre-wrap; overflow-wrap: anywhere; margin: 3px 0 4px; }
+  .cmt .meta { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--ink-3); }
+  .cmt .meta .btn { padding: 0 4px; }
+  .cmt.reply { grid-template-columns: 26px minmax(0, 1fr); margin-left: 42px; padding: 8px 14px 8px 0; border-top: 0; border-left: 2px solid var(--line); padding-left: 12px; }
+  .cmt.reply .av { width: 26px; height: 26px; }
+  .cmt.sel { background: var(--accent-soft); }
+  .replies-more { margin-left: 56px; padding: 4px 0 8px; font-size: 12px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-2); object-fit: cover; display: block; }
+  .title { font-weight: 500; }
+  .clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 560px; }
+  .drawer { position: fixed; top: 0; right: 0; width: min(520px, 100%); height: 100vh; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow); transform: translateX(105%); transition: transform .2s; display: flex; flex-direction: column; z-index: 20; }
+  .drawer.open { transform: none; }
+  .drawer .dh { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .drawer .dh h2 { margin: 0; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drawer .db { padding: 16px; overflow: auto; display: grid; gap: 14px; align-content: start; }
+  .drawer img.cover { width: 100%; border-radius: 6px; background: var(--surface-2); max-height: 280px; object-fit: cover; }
+  .kv { display: grid; grid-template-columns: 90px 1fr; gap: 6px 10px; font-size: 13px; margin: 0; }
+  .kv dt { color: var(--ink-3); margin: 0; } .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .metrics { display: flex; gap: 14px; flex-wrap: wrap; }
+  .metrics div { display: grid; } .metrics b { font-size: 17px; font-weight: 600; } .metrics span { font-size: 11px; color: var(--ink-3); }
+  details summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 6px; overflow: auto; max-height: 50vh; font: 12px/1.5 var(--mono); margin: 8px 0 0; }
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 19; display: none; }
+  .scrim.open { display: block; }
+  #msg { position: fixed; bottom: 16px; right: 16px; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 6px; font-size: 13px; display: none; max-width: 60vw; z-index: 30; }
+  .alerts { display: grid; gap: 8px; }
+  .alerts:empty { display: none; }
+  .alert { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+  .alert.bad { background: var(--bad-soft); color: var(--bad); }
+  .alert .btn { margin-left: auto; padding: 2px 10px; font-size: 12px; }
+  .list-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .method { display: inline-block; min-width: 52px; text-align: center; padding: 1px 6px; border-radius: 4px; font: 600 11px var(--mono); background: var(--surface-2); color: var(--ink-2); }
+  .method.get { background: var(--ok-soft); color: var(--ok); } .method.post { background: var(--accent-soft); color: var(--accent); }
+  .ep { border-top: 1px solid var(--line); }
+  .ep summary { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; list-style: none; }
+  .ep summary::-webkit-details-marker { display: none; }
+  .ep summary .path { font: 13px var(--mono); white-space: nowrap; }
+  .ep summary .desc { color: var(--ink-3); font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ep .body { padding: 4px 12px 12px 74px; display: grid; gap: 8px; font-size: 13px; }
+  .ep .body pre { max-height: 40vh; }
+  .params { display: grid; grid-template-columns: max-content max-content 1fr; gap: 4px 12px; font-size: 12px; align-items: baseline; }
+  .params .k { font-family: var(--mono); } .params .ty { color: var(--ink-3); }
+  .snippet { position: relative; background: var(--surface-2); border-radius: 6px; padding: 10px 44px 10px 12px; font: 12px/1.5 var(--mono); overflow-x: auto; white-space: pre; }
+  .snippet button { position: absolute; top: 6px; right: 6px; }
+  .note { padding: 12px 16px; font-size: 13px; color: var(--ink-2); line-height: 1.7; }
+  .note p { margin: 0 0 6px; } .note p:last-child { margin: 0; }
+  .note:empty { display: none; }
+  .matrix { font-size: 13px; }
+  .matrix th { text-align: center; }
+  .matrix th:first-child, .matrix td:first-child { text-align: left; white-space: nowrap; }
+  .matrix td { text-align: center; padding: 9px 10px; }
+  .matrix .yes { color: var(--ok); font-weight: 600; }
+  .matrix .todo { color: var(--warn); font-size: 12px; }
+  .matrix .no { color: var(--line-strong); }
+  .matrix .pcell { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: default; }
+  .matrix .pcell .tip { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: 420px; max-width: 70vw; padding: 10px 12px; background: var(--surface); color: var(--ink-2); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.12); font-size: 12.5px; line-height: 1.6; white-space: normal; text-align: left; font-weight: 400; }
+  .matrix .pcell:hover .tip, .matrix .pcell:focus-within .tip { display: block; }
+  .matrix .pcell.has-tip .plogo { box-shadow: 0 0 0 2px var(--accent-soft); }
+  .ep summary { padding: 11px 16px; gap: 12px; }
+  .ep summary .name { font-weight: 500; white-space: nowrap; }
+  .ep summary .desc { font-size: 12px; }
+  .ep .body { padding: 2px 16px 14px 78px; gap: 10px; }
+  .ep .body .en { color: var(--ink-3); font-size: 12px; }
+  .devpanel > summary { cursor: pointer; list-style: none; }
+  .devpanel > summary::-webkit-details-marker { display: none; }
+  .devpanel:not([open]) > summary { border-bottom: 0; }
+  @media (max-width: 960px) { .app { grid-template-columns: 1fr; } .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; } .side .bottom { display: none; } .bench, .cols { grid-template-columns: 1fr; } .form { position: static; } .omni { width: 100%; } }
+  @media (prefers-reduced-motion: reduce) { .drawer, .meter i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><span class="logo"></span>SocialLens</div>
+    <button class="nav on" data-page="overview">概览</button>
+    <button class="nav" data-page="query">查询</button>
+    <button class="nav" data-page="collect">连续拉取 <span class="cnt" id="n-collect"></span></button>
+    <button class="nav" data-page="downloads">下载 <span class="cnt" id="n-downloads"></span></button>
+    <button class="nav" data-page="tasks">任务</button>
+    <button class="nav" data-page="cache">缓存 <span class="cnt" id="n-cache"></span></button>
+    <button class="nav" data-page="api">接口</button>
+    <div class="bottom">
+      <span id="side-conn"><span class="dot"></span> 连接中…</span>
+      <code>MCP: uv run sociallens-mcp</code>
+    </div>
+  </aside>
+
+  <div class="content">
+    <div class="topbar">
+      <h1 id="page-title">概览</h1>
+      <div class="omni"><span class="muted">⌕</span><input id="omni" placeholder="关键词、帖子或用户链接、id，回车直达"></div>
+    </div>
+
+    <section class="page on" id="page-overview">
+      <div class="alerts" id="alerts"></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="cols">
+        <div class="panel"><div class="ph">最近任务 <span>最近 20 条，15 秒刷新</span></div><div id="recent"></div></div>
+        <div class="panel"><div class="ph">下载 <span id="dl-sub"></span></div><div id="dl-recent"></div></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-query">
+      <div class="bench">
+        <div class="form">
+          <label>平台<span class="chips" id="q-platforms"></span></label>
+          <label>动作<select id="q-action" class="field"></select></label>
+          <label id="l-keyword">关键词<input id="q-keyword" class="field" placeholder="关键词"></label>
+          <label id="l-id" hidden>id<input id="q-id" class="field" placeholder="帖子 id / 用户 id"></label>
+          <label id="l-cid" hidden>评论 id<input id="q-cid" class="field"></label>
+          <label id="l-xsec" hidden>xsec_token<input id="q-xsec" class="field" placeholder="小红书链接里的 xsec_token"></label>
+          <label id="l-order" hidden>排序<div class="seg" id="q-order"></div></label>
+          <label>条数<div class="seg"><button class="on" data-mode="page">一页</button><button data-mode="collect">连续到 <input id="q-limit" type="number" value="200" min="1" max="1000" style="width:56px;border:0;background:none;color:inherit;font:inherit;text-align:center"> 条</button></div></label>
+          <div style="display:flex;gap:8px"><button class="btn primary" id="q-run" style="flex:1">查询</button><button class="btn" id="q-next" disabled>下一页</button></div>
+          <span class="sub" id="q-info"></span>
+        </div>
+        <div class="results">
+          <div class="toolbar"><button class="btn ghost" id="q-back" onclick="goBack()" hidden>← 返回</button><span id="q-ctx" class="ctx"></span><span id="q-count">还没有结果</span><span class="sp"></span><button class="btn ghost" onclick="exportJSON(state.results,'sociallens')">导出 JSON</button><button class="btn ghost" onclick="exportCSV(state.results,'sociallens')">导出 CSV</button></div>
+          <div id="q-stale" class="stale" hidden></div>
+          <div class="tablewrap" id="q-results"><div class="empty">选平台和动作，或直接在上面粘一条链接。</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-collect">
+      <div class="panel"><div class="ph">连续拉取任务 <span>每 2 秒刷新进行中的</span><button class="btn ghost" onclick="loadCollects()">刷新</button></div><div id="collect-list"></div></div>
+    </section>
+
+    <section class="page" id="page-downloads">
+      <div class="panel">
+        <div class="ph">下载 <span id="d-dir"></span><span class="list-tools"><select id="d-platform" class="field" style="width:auto"></select><input id="d-id" class="field" placeholder="帖子 id 或链接" style="width:260px"><input id="d-xsec" class="field" placeholder="xsec_token" style="width:150px"><button class="btn primary" onclick="startDownloadFromForm()">下载</button><button class="btn ghost" onclick="loadDownloads()">刷新</button></span></div>
+        <div id="d-list"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-tasks">
+      <div class="panel">
+        <div class="ph">任务 <span class="list-tools"><select id="t-platform" class="field" style="width:auto" onchange="loadTasks()"><option value="">全部平台</option></select><select id="t-status" class="field" style="width:auto" onchange="loadTasks()"><option value="">全部状态</option><option>queued</option><option>running</option><option>done</option><option>failed</option><option>cancelled</option></select><label class="chk"><input type="checkbox" id="t-debug" onchange="loadTasks()"> 显示调试动作</label><button class="btn ghost" onclick="loadTasks()">刷新</button></span></div>
+        <div class="tablewrap" id="t-list"><div class="empty">加载中…</div></div>
+        <div class="note" id="t-more" hidden><button class="btn ghost" onclick="loadTasks(true)">加载更多</button></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-api">
+      <div class="panel">
+        <div class="ph">各平台能用什么 <span>打勾的是有真实样本和测试、在真浏览器里验证过的；"待验证"是代码已完成但还没跑通；空的是平台没有。鼠标放在平台图标上看该平台的说明</span></div>
+        <div class="tablewrap" style="overflow:visible"><table class="matrix" id="api-matrix"></table></div>
+      </div>
+      <div class="panel"><div class="ph">任务与下载 <span>长任务立即返回 task_id，之后轮询</span></div><div id="api-tasks"></div></div>
+      <div class="panel"><div class="ph">系统与工具 <span>状态、平台列表、链接识别、本地缓存</span></div><div id="api-system"></div></div>
+      <div class="panel">
+        <div class="ph">数据接口 <span class="list-tools"><span>平台</span><select id="api-platform" class="field" style="width:auto"></select></span></div>
+        <div class="note" id="api-data-note"></div>
+        <div id="api-data"></div>
+      </div>
+      <details class="panel devpanel"><summary class="ph">开发调试 <span>录制模式、原始响应、直接执行任意动作，平时用不到</span></summary><div id="api-dev"></div></details>
+      <div class="panel">
+        <div class="ph">MCP <span>给 Claude Code 之类的模型客户端用，独立进程，纯 REST 薄壳</span></div>
+        <div class="note"><div class="snippet" id="mcp-cmd"></div><div class="sub" style="margin-top:8px">其他客户端的配置：<code class="mono">{"command": "uv", "args": ["run", "--project", "&lt;repo&gt;/backend", "sociallens-mcp"], "env": {"SOCIALLENS_URL": "http://127.0.0.1:17800"}}</code></div></div>
+        <div id="api-mcp"></div>
+      </div>
+      <div class="panel">
+        <div class="ph">约定 <span class="list-tools"><a href="/docs" target="_blank">Swagger ↗</a><a href="/openapi.json" target="_blank">openapi.json ↗</a></span></div>
+        <div class="note">
+          <p>后端只监听本机 <code id="api-base" class="mono"></code>，没有鉴权，程序直接调。</p>
+          <p>成功响应是 <code class="mono">{success: true, data, cursor?, task_id?}</code>，失败是 <code class="mono">{success: false, error: {code, message}}</code>。列表类的 <code class="mono">data</code> 是 <code class="mono">{items, total, kind?}</code>，翻页把顶层 <code class="mono">cursor</code> 原样传回去；cursor 绑定一个浏览器标签页，闲置几分钟后过期（cursor_expired），从第一页重来即可。</p>
+          <p>错误码：<code class="mono">not_logged_in</code> 未登录，<code class="mono">extension_offline</code> 扩展没连上，<code class="mono">captcha_required</code> 站点要求验证，队列暂停，<code class="mono">rate_limited</code> 被限流，<code class="mono">cursor_expired</code> 游标过期，<code class="mono">timeout</code> 页面没在时限内给出数据，<code class="mono">unsupported</code> 该平台没有这个动作，<code class="mono">not_found</code> 对象不存在。</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-cache">
+      <div class="panel">
+        <div class="ph">缓存 <span class="list-tools"><select id="c-kind" class="field" style="width:auto" onchange="loadCache()"><option value="posts">帖子</option><option value="users">用户</option><option value="comments">评论</option></select><select id="c-platform" class="field" style="width:auto" onchange="loadCache()"><option value="">全部平台</option></select><input id="c-limit" type="number" value="200" min="1" max="1000" class="field" style="width:80px" onchange="loadCache()"><button class="btn ghost" onclick="loadCache()">刷新</button><button class="btn ghost" onclick="exportJSON(state.cache,'cache')">导出 JSON</button><button class="btn ghost" onclick="exportCSV(state.cache,'cache')">导出 CSV</button></span></div>
+        <div class="tablewrap" id="c-results"><div class="empty">查询过的帖子、用户、评论都会存在本地 SQLite，这里按最近更新排序。</div></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer">
+  <div class="dh"><span id="dr-logo"></span><h2 id="dr-title"></h2><button class="btn ghost" onclick="closeDrawer()">关闭</button></div>
+  <div class="db" id="dr-body"></div>
+</aside>
+<div id="msg"></div>
+
+<script src="icons.js"></script>
+<script>
+const API = "/api/v1";
+const LOGOS = {
+  bilibili: { bg: "#00A1D6", mark: "B" }, xiaohongshu: { bg: "#FF2442", mark: "红" }, douyin: { bg: "#161823", mark: "抖" }, kuaishou: { bg: "#FF4906", mark: "快" },
+  weixin_mp: { bg: "#07C160", mark: "公" }, weixin_channels: { bg: "#FA9D3B", mark: "视" }, youtube: { bg: "#FF0000", mark: "▶" }, x: { bg: "#000000", mark: "X" },
+  reddit: { bg: "#FF4500", mark: "r/" }, zhihu: { bg: "#0066FF", mark: "知" }, tiktok: { bg: "#010101", mark: "T" },
+  instagram: { bg: "#E1306C", mark: "ig" },
+  linkedin: { bg: "#0A66C2", mark: "in" },
+  toutiao: { bg: "#ED4040", mark: "头" },
+};
+const ICONS = window.PLATFORM_ICONS || {};
+const ACTIONS = [
+  ["search_posts", "搜索内容"], ["search_users", "搜索用户"], ["get_post", "帖子详情"], ["get_comments", "评论"], ["get_replies", "评论的回复"],
+  ["get_user", "用户资料"], ["get_user_posts", "用户的帖子"], ["get_feed", "推荐流"], ["get_trending", "热榜"],
+];
+const LIST_ACTIONS = new Set(["search_posts", "search_users", "get_comments", "get_replies", "get_user_posts", "get_feed", "get_trending"]);
+const ORDERS = { bilibili: { search_posts: [["totalrank", "综合"], ["click", "播放"], ["pubdate", "最新"]], get_user_posts: [["pubdate", "最新"], ["click", "播放"]], get_comments: [["3", "热门"], ["2", "时间"]] }, x: { search_posts: [["live", "最新"], ["top", "热门"]] }, reddit: { search_posts: [["relevance", "相关"], ["hot", "热门"], ["top", "最高"], ["new", "最新"]], get_user_posts: [["new", "最新"], ["hot", "热门"], ["top", "最高"]], get_comments: [["confidence", "最佳"], ["top", "最高"], ["new", "最新"]] }, zhihu: { get_user_posts: [["answers", "回答"], ["articles", "文章"]] } };
+const state = { platforms: [], status: null, page: "overview", platform: null, mode: "page", results: [], resultKind: "posts", cursor: null, lastRaw: null, cache: [], selected: null, ctx: null, history: [] };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtN = (n) => n == null ? "–" : n >= 1e8 ? (n / 1e8).toFixed(1) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n);
+const fmtT = (t) => t ? String(t).replace("T", " ").slice(5, 16) : "–";
+const fmtB = (b) => b == null ? "–" : b >= 1 << 30 ? (b / (1 << 30)).toFixed(2) + " GB" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : b >= 1024 ? (b / 1024).toFixed(0) + " KB" : b + " B";
+let msgTimer;
+function toast(text, bad) { const m = $("msg"); m.textContent = text; m.style.background = bad ? "var(--bad)" : "var(--ink)"; m.style.color = bad ? "#fff" : "var(--bg)"; m.style.display = "block"; clearTimeout(msgTimer); msgTimer = setTimeout(() => (m.style.display = "none"), bad ? 6000 : 2500); }
+async function api(path, opts) {
+  const res = await fetch(API + path, { headers: { "content-type": "application/json" }, ...opts });
+  let body; try { body = await res.json(); } catch { body = { error: { code: "http_" + res.status, message: await res.text() } }; }
+  if (!res.ok || body.success === false) { const e = body.error || {}; throw new Error(`${e.code || res.status}: ${e.message || ""}`); }
+  return body;
+}
+const plat = (id) => state.platforms.find((p) => p.id === id);
+const pname = (id) => id === "_system" ? "系统" : (plat(id)?.name || id);
+function logo(id, sm, extraId) { const l = LOGOS[id] || { bg: "#666", mark: "?" }; const ico = ICONS[id]; return `<span ${extraId ? `id="${extraId}" ` : ""}class="plogo${sm ? " sm" : ""}" style="background:${l.bg}" title="${esc(pname(id))}">${ico ? `<img class="ok" src="${ico}" alt="">` : esc(l.mark)}</span>`; }
+function itemKind(it) { if (!it) return "posts"; if (it.type === "topic") return "topics"; if ("post_id" in it && "likes" in it) return "comments"; if (it.metrics && "followers" in it.metrics && !("type" in it)) return "users"; return "posts"; }
+function saveBlob(name, text, type) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+const J = (v) => esc(JSON.stringify(v ?? ""));
+
+const TITLES = { overview: "概览", query: "查询", collect: "连续拉取", downloads: "下载", tasks: "任务", cache: "缓存", api: "接口" };
+document.querySelectorAll(".nav").forEach((b) => b.addEventListener("click", () => showPage(b.dataset.page)));
+function showPage(name) {
+  state.page = name;
+  document.querySelectorAll(".nav").forEach((b) => b.classList.toggle("on", b.dataset.page === name));
+  document.querySelectorAll("section.page").forEach((s) => s.classList.toggle("on", s.id === "page-" + name));
+  $("page-title").textContent = TITLES[name] || name;
+  location.hash = name;
+  ({ overview: loadOverview, collect: loadCollects, downloads: loadDownloads, tasks: loadTasks, cache: loadCache, api: loadApi })[name]?.();
+}
+
+$("omni").addEventListener("keydown", async (e) => {
+  if (e.key !== "Enter") return;
+  const q = $("omni").value.trim(); if (!q) return;
+  try {
+    const r = (await api("/resolve?q=" + encodeURIComponent(q))).data;
+    if (r.kind === "post" && r.platform) return quick(r.platform, "get_post", { id: r.id, xsec: r.xsec_token });
+    if (r.kind === "user" && r.platform) return quick(r.platform, "get_user", { id: r.id, xsec: r.xsec_token });
+    if (r.kind === "short_link") return toast(`${pname(r.platform)} 的短链接暂时不能直接解析，请打开后复制完整地址`, true);
+    quick(r.platform || state.platform || state.platforms[0]?.id, "search_posts", { keyword: r.kind === "keyword" && r.id ? r.id : q });
+  } catch (err) { toast(err.message, true); }
+});
+
+async function loadPlatforms() {
+  state.platforms = (await api("/platforms")).data;
+  $("d-platform").innerHTML = state.platforms.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  for (const id of ["t-platform", "c-platform"]) $(id).innerHTML = `<option value="">全部平台</option>` + state.platforms.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  $("q-platforms").innerHTML = state.platforms.map((p) => `<button class="chip" data-id="${p.id}">${logo(p.id, true)}${esc(p.name)}</button>`).join("");
+  $("q-platforms").querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => selectPlatform(c.dataset.id)));
+  if (!state.platform) selectPlatform(state.platforms[0]?.id);
+}
+async function loadStatus() {
+  try {
+    const st = (await api("/status")).data; state.status = st;
+    const ext = st.extension;
+    $("side-conn").innerHTML = `<span class="dot ${ext.online ? "ok" : "bad"}"></span> 后端 v${esc(st.backend_version)} · ${ext.online ? "扩展已连接" : "扩展未连接"}`;
+    $("q-platforms").querySelectorAll(".chip").forEach((c) => c.classList.toggle("off", st.platforms?.[c.dataset.id]?.logged_in === false));
+    return st;
+  } catch (e) { $("side-conn").innerHTML = `<span class="dot bad"></span> 后端不可达`; throw e; }
+}
+async function loadOverview() {
+  let st; try { st = await loadStatus(); } catch (e) { $("tiles").innerHTML = `<div class="empty">后端不可达：${esc(e.message)}</div>`; return; }
+  const alerts = [];
+  if (!st.extension.online) alerts.push(`<div class="alert bad"><span class="dot bad"></span>扩展没有连上后端：在 chrome://extensions 加载 extension/dist，或点扩展图标里的"重连"。</div>`);
+  for (const p of state.platforms) {
+    const q = st.queues?.[p.id] || {};
+    if (q.paused_for_s > 0) alerts.push(`<div class="alert"><span class="dot warn"></span>${logo(p.id, true)} ${esc(p.name)} 队列已暂停，还剩 ${Math.ceil(q.paused_for_s / 60)} 分钟。多半是风控或验证码，先在浏览器里处理，再点恢复。<button class="btn" onclick="resume('${p.id}')">恢复</button></div>`);
+  }
+  $("alerts").innerHTML = alerts.join("");
+  $("tiles").innerHTML = state.platforms.map((p) => {
+    const s = st.platforms?.[p.id] || {}; const q = st.queues?.[p.id] || {}; const budget = p.rate_limit?.page_loads || 0; const used = q.page_loads_in_window || 0;
+    const ratio = budget ? used / budget : 0;
+    const pill = s.logged_in === false ? `<span class="pill bad">未登录</span>` : q.paused_for_s > 0 ? `<span class="pill warn">已暂停 ${Math.ceil(q.paused_for_s / 60)}m</span>` : q.budget_wait_s > 0 ? `<span class="pill warn">配额等待</span>` : q.running ? `<span class="pill ok">执行中</span>` : p.id === "weixin_channels" ? `<span class="pill neutral">仅后台</span>` : `<span class="pill neutral">空闲</span>`;
+    const right = s.logged_in === false ? `<a href="${esc(p.login_url || p.home_url)}" target="_blank" onclick="event.stopPropagation()">去登录 ↗</a>` : `${(s.tabs || []).length ? (s.tabs || []).length + " 个标签页" : ""}`;
+    return `<div class="tile" onclick="quickPlatform('${p.id}')"><div class="n">${logo(p.id)}${esc(p.name)}${pill}</div><div class="meter"><i class="${ratio >= 0.9 ? "bad" : ratio >= 0.6 ? "warn" : ""}" style="width:${Math.min(100, ratio * 100)}%"></i></div><div class="m"><span>页面 ${used}/${budget || "∞"} · ${Math.round((p.rate_limit?.window_s || 600) / 60)} 分钟</span><span>${right}</span></div></div>`;
+  }).join("");
+  const tasks = (await api("/tasks?limit=60")).data.filter((t) => t.platform !== "_system" && !isDebugTask(t)).slice(0, 20);
+  $("recent").innerHTML = tasks.length ? tasks.map((t) => `<div class="row"><span class="t">${esc(fmtT(t.created_at).slice(6))}</span><span>${logo(t.platform, true)} ${esc(pname(t.platform))} · ${esc(actionName(t.action))} <span class="sub">${esc(taskSummary(t))}</span></span>${statusPill(t)}</div>`).join("") : `<div class="empty">还没有任务</div>`;
+  const dls = (await api("/downloads?limit=6")).data;
+  const active = dls.filter((t) => t.status === "running" || t.status === "queued");
+  $("dl-sub").textContent = active.length ? `${active.length} 个进行中` : `最近 ${dls.length} 个`;
+  $("dl-recent").innerHTML = dls.length ? dls.slice(0, 5).map((t) => dlRow(t)).join("") : `<div class="empty">还没有下载</div>`;
+  $("n-downloads").textContent = active.length || "";
+  const cols = (await api("/collects?limit=20")).data.filter((t) => t.status === "running" || t.status === "queued");
+  $("n-collect").textContent = cols.length || "";
+}
+async function resume(platform) { try { await api(`/${platform}/resume`, { method: "POST" }); toast("已恢复队列"); loadOverview(); } catch (e) { toast(e.message, true); } }
+const DEBUG_ACTIONS = new Set(["echo", "fetch", "wait_capture", "read_global", "scroll_capture", "dom_probe", "list_captures", "find_scripts", "read_element", "click", "type"]);
+const isDebugTask = (t) => DEBUG_ACTIONS.has(t.action) || (t.action === "navigate" && DEBUG_ACTIONS.has(t.params?.page_action));
+function actionName(a) { return ({ download: "下载", collect: "连续拉取", navigate: "打开页面", echo: "echo" }[a]) || (ACTIONS.find((x) => x[0] === a)?.[1]) || a; }
+function taskSummary(t) {
+  const p = t.params || {}, r = t.result || {};
+  if (t.action === "collect") return `${actionName(p.action)} ${p.params?.keyword || p.params?.post_id || p.params?.id || ""} · ${r.count || 0} 条 ${r.pages || 0} 页`;
+  if (t.action === "download") return `${p.post_id} · ${(r.files || []).length} 个文件`;
+  const pp = p.page_params || {};
+  const key = [p.keyword ?? pp.keyword, p.post_id ?? pp.post_id ?? p.id ?? pp.id, p.comment_id ?? pp.comment_id].filter(Boolean).join(" ").slice(0, 60);
+  return p.more ? (key ? `${key} · 续页` : "续页") : key;
+}
+function statusPill(t) { const m = { done: ["neutral", "完成"], failed: ["bad", t.error?.code || "失败"], running: ["ok", "执行中"], queued: ["accent", "排队"], cancelled: ["neutral", "已取消"] }[t.status] || ["neutral", t.status]; return `<span class="pill ${m[0]}">${esc(m[1])}</span>`; }
+function dlRow(t, extra = "") {
+  const r = t.result || {}; const files = r.files || []; const done = files.filter((f) => f.status === "done").length;
+  const bytes = files.reduce((a, f) => a + (f.bytes_done || 0), 0), total = files.reduce((a, f) => a + (f.bytes_total || 0), 0);
+  const pct = total ? Math.round(bytes / total * 100) : (t.status === "done" ? 100 : 0);
+  return `<div class="dl"><div style="display:flex;gap:8px;align-items:center">${logo(t.platform, true)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.title || t.params?.post_id)}</span>${statusPill(t)}${extra}</div><div class="meter"><i class="${t.status === "failed" ? "bad" : ""}" style="width:${pct}%"></i></div><div class="sub" style="display:flex;justify-content:space-between;gap:8px"><span>${files.length ? `${done}/${files.length} 个文件 · ${fmtB(bytes)}${total ? " / " + fmtB(total) : ""}` : esc(r.stage || "")}</span>${t.error ? `<span class="err" title="${esc(t.error.message)}">${esc(t.error.message)}</span>` : (files[0]?.path ? `<span class="mono">${esc(files[0].path.split(/[\\/]/).slice(-2).join("/"))}</span>` : "")}</div></div>`;
+}
+
+function selectPlatform(id) {
+  state.platform = id; updateStale();
+  $("q-platforms").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.id === id));
+  const caps = new Set((plat(id)?.capabilities || []).map((c) => c.action));
+  const cur = $("q-action").value;
+  $("q-action").innerHTML = ACTIONS.filter(([a]) => caps.has(a)).map(([a, n]) => `<option value="${a}">${n}</option>`).join("");
+  if ([...$("q-action").options].some((o) => o.value === cur)) $("q-action").value = cur;
+  syncForm();
+}
+function syncForm() {
+  const a = $("q-action").value, p = state.platform;
+  $("l-keyword").hidden = !a.startsWith("search_");
+  $("l-id").hidden = !["get_post", "get_comments", "get_replies", "get_user", "get_user_posts"].includes(a);
+  $("q-id").placeholder = a.startsWith("get_user") ? "用户 id / @handle / 用户名" : "帖子 id（BV 号、笔记 id、视频 id、推文 id）";
+  $("l-cid").hidden = a !== "get_replies";
+  $("l-xsec").hidden = !(p === "xiaohongshu" && !$("l-id").hidden);
+  const orders = ORDERS[p]?.[a] || null;
+  $("l-order").hidden = !orders;
+  if (orders) { $("q-order").innerHTML = orders.map(([v, n], i) => `<button data-v="${v}" class="${i === 0 ? "on" : ""}">${n}</button>`).join(""); $("q-order").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { $("q-order").querySelectorAll("button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); })); }
+  document.querySelectorAll("[data-mode]").forEach((b) => { b.disabled = b.dataset.mode === "collect" && !LIST_ACTIONS.has(a); });
+  if (state.mode === "collect" && !LIST_ACTIONS.has(a)) setMode("page");
+  $("q-run").textContent = state.mode === "collect" ? "连续拉取" : "查询";
+}
+function setMode(m) { state.mode = m; document.querySelectorAll("[data-mode]").forEach((x) => x.classList.toggle("on", x.dataset.mode === m)); $("q-run").textContent = m === "collect" ? "连续拉取" : "查询"; }
+$("q-action").addEventListener("change", syncForm);
+document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", (e) => { if (e.target.id === "q-limit") return; setMode(b.dataset.mode); }));
+$("q-limit").addEventListener("click", (e) => e.stopPropagation());
+for (const id of ["q-keyword", "q-id", "q-cid"]) $(id).addEventListener("keydown", (e) => e.key === "Enter" && $("q-run").click());
+$("q-run").addEventListener("click", () => (state.mode === "collect" ? runCollect() : runQuery(false)));
+$("q-next").addEventListener("click", () => runQuery(true));
+function queryParams() {
+  const a = $("q-action").value; const params = {};
+  if (a.startsWith("search_")) params.keyword = $("q-keyword").value.trim();
+  if (["get_comments", "get_replies"].includes(a)) params.post_id = $("q-id").value.trim();
+  if (["get_post", "get_user", "get_user_posts"].includes(a)) params.id = $("q-id").value.trim();
+  if (a === "get_replies") params.comment_id = $("q-cid").value.trim();
+  if (!$("l-xsec").hidden && $("q-xsec").value.trim()) params.xsec_token = $("q-xsec").value.trim();
+  const ob = $("q-order").querySelector("button.on"); if (!$("l-order").hidden && ob) params[a === "get_comments" ? "mode" : "order"] = ob.dataset.v;
+  return params;
+}
+function queryPath(more) {
+  const p = state.platform, a = $("q-action").value, prm = queryParams(); const q = new URLSearchParams();
+  if (more && state.cursor) q.set("cursor", state.cursor);
+  for (const k of ["xsec_token", "order", "mode"]) if (prm[k]) q.set(k, prm[k]);
+  const id = encodeURIComponent(prm.id || prm.post_id || "");
+  let path;
+  if (a === "search_posts") { q.set("keyword", prm.keyword); q.set("type", "post"); path = `/${p}/search`; }
+  else if (a === "search_users") { q.set("keyword", prm.keyword); q.set("type", "user"); path = `/${p}/search`; }
+  else if (a === "get_post") path = `/${p}/posts/${id}`;
+  else if (a === "get_comments") path = `/${p}/posts/${id}/comments`;
+  else if (a === "get_replies") path = `/${p}/posts/${id}/comments/${encodeURIComponent(prm.comment_id)}/replies`;
+  else if (a === "get_user") path = `/${p}/users/${id}`;
+  else if (a === "get_user_posts") path = `/${p}/users/${id}/posts`;
+  else if (a === "get_feed") path = `/${p}/feed`;
+  else path = `/${p}/trending`;
+  const qs = q.toString(); return path + (qs ? "?" + qs : "");
+}
+async function runQuery(more) {
+  $("q-run").disabled = true; $("q-next").disabled = true; $("q-info").textContent = "请求中，页面级动作要开标签页，可能要十几秒…";
+  const t0 = Date.now();
+  try {
+    if (!more) pushHistory();
+    const r = await api(queryPath(more)); state.lastRaw = r;
+    const single = !Array.isArray(r.data?.items) && !Array.isArray(r.data) && r.data?.id;
+    const items = Array.isArray(r.data?.items) ? r.data.items : Array.isArray(r.data) ? r.data : [r.data];
+    state.results = more ? state.results.concat(items) : items; state.cursor = r.cursor || null;
+    state.resultKind = r.data?.kind === "topics" ? "topics" : itemKind(items[0]);
+    $("q-info").textContent = `${((Date.now() - t0) / 1000).toFixed(1)} 秒 · 任务 ${r.task_id || "–"}`;
+    $("q-count").textContent = `${state.results.length} 条${r.data?.total ? "，共约 " + fmtN(r.data.total) : ""}${state.cursor ? "，可翻页" : "，没有更多"}`;
+    renderItems($("q-results"), state.results, state.resultKind, state.platform);
+    if (!more) setContext({ platform: state.platform, action: $("q-action").value, key: ctxKey($("q-action").value, queryParams()), form: formSnapshot() });
+    if (single) openDrawer(items[0]);
+  } catch (e) { $("q-info").innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; toast(e.message, true); }
+  finally { $("q-run").disabled = false; $("q-next").disabled = !state.cursor; }
+}
+async function runCollect() {
+  const a = $("q-action").value, p = state.platform, params = queryParams();
+  $("q-run").disabled = true; $("q-next").disabled = true; const t0 = Date.now();
+  try {
+    pushHistory();
+    const r = await api(`/${p}/collect`, { method: "POST", body: JSON.stringify({ action: a, params, limit: Number($("q-limit").value) || 100 }) });
+    const id = r.data.id; let t;
+    for (;;) {
+      t = (await api(`/tasks/${id}`)).data; const res = t.result || {};
+      $("q-info").textContent = `连续拉取中：${res.count || 0} 条，${res.pages || 0} 页，${((Date.now() - t0) / 1000).toFixed(0)} 秒 · 任务 ${id}`;
+      if (["done", "failed", "cancelled"].includes(t.status)) break;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    const res = t.result || {}; state.results = res.items || []; state.cursor = null; state.lastRaw = t; state.resultKind = res.kind === "topics" ? "topics" : itemKind(state.results[0]);
+    const why = { limit: "达到条数上限", no_more: "已到列表末尾", max_pages: "达到页数上限", error: "中途出错，保留已拿到的", cancelled: "已取消" }[res.stopped_by] || res.stopped_by || "";
+    $("q-info").innerHTML = `${res.count || 0} 条 / ${res.pages || 0} 页 · ${why}${res.error ? ` <span style="color:var(--bad)">${esc(res.error.code)}: ${esc(res.error.message)}</span>` : ""} · ${((Date.now() - t0) / 1000).toFixed(0)} 秒`;
+    $("q-count").textContent = `${state.results.length} 条${res.total ? "，站点总数约 " + fmtN(res.total) : ""}`;
+    renderItems($("q-results"), state.results, state.resultKind, p);
+    setContext({ platform: p, action: a, key: ctxKey(a, params), source: `连续拉取 ${id}`, form: formSnapshot() });
+  } catch (e) { $("q-info").innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; toast(e.message, true); }
+  finally { $("q-run").disabled = false; }
+}
+function quick(platform, action, o = {}) {
+  closeDrawer(); showPage("query"); if (platform && platform !== state.platform) selectPlatform(platform);
+  $("q-action").value = action; if (o.keyword != null) $("q-keyword").value = o.keyword; if (o.id != null) $("q-id").value = o.id; if (o.cid != null) $("q-cid").value = o.cid; $("q-xsec").value = o.xsec || "";
+  setMode("page"); syncForm(); runQuery(false);
+}
+function quickPlatform(id) { showPage("query"); selectPlatform(id); $("q-keyword").focus(); }
+// ---- results context / history ---------------------------------------------------------------
+function formSnapshot() {
+  return { platform: state.platform, action: $("q-action").value, keyword: $("q-keyword").value, id: $("q-id").value, cid: $("q-cid").value, xsec: $("q-xsec").value, mode: state.mode, limit: $("q-limit").value };
+}
+function pushHistory() {
+  if (!state.results.length || !state.ctx) return;
+  state.history.push({ ctx: state.ctx, results: state.results, kind: state.resultKind, cursor: state.cursor, count: $("q-count").textContent, info: $("q-info").innerHTML });
+  if (state.history.length > 20) state.history.shift();
+}
+function setContext(ctx) {
+  state.ctx = ctx;
+  const label = ctx ? `${logo(ctx.platform, true)} ${esc(pname(ctx.platform))} · ${esc(actionName(ctx.action))}${ctx.key ? ` · <span class="mono">${esc(ctx.key)}</span>` : ""}${ctx.source ? ` <span class="sub">（${esc(ctx.source)}）</span>` : ""}` : "";
+  $("q-ctx").innerHTML = label;
+  $("q-back").hidden = !state.history.length;
+  updateStale();
+}
+function updateStale() { $("q-stale").hidden = true; } // the 结果来源 line already says which platform the results belong to
+function goBack() {
+  const prev = state.history.pop(); if (!prev) return;
+  state.results = prev.results; state.resultKind = prev.kind; state.cursor = prev.cursor; state.ctx = null;
+  const f = prev.ctx.form || {};
+  if (f.platform && f.platform !== state.platform) selectPlatform(f.platform);
+  if (f.action && [...$("q-action").options].some((o) => o.value === f.action)) $("q-action").value = f.action;
+  if (f.keyword != null) $("q-keyword").value = f.keyword; if (f.id != null) $("q-id").value = f.id; if (f.cid != null) $("q-cid").value = f.cid; if (f.xsec != null) $("q-xsec").value = f.xsec;
+  syncForm(); $("q-count").textContent = prev.count; $("q-info").innerHTML = prev.info;
+  renderItems($("q-results"), state.results, state.resultKind, prev.ctx.platform); setContext(prev.ctx); $("q-next").disabled = !state.cursor; closeDrawer();
+}
+function ctxKey(a, prm) { return a.startsWith("search_") ? prm.keyword : a === "get_replies" ? `${prm.post_id} / ${prm.comment_id}` : (prm.id || prm.post_id || ""); }
+
+function renderItems(el, items, kind, platform) {
+  if (!items.length) { el.innerHTML = `<div class="empty">没有数据</div>`; return; }
+  let head, rows;
+  const xs = (it) => it?.raw?.xsec_token || "";
+  if (kind === "topics") {
+    head = `<tr><th>#</th><th>话题</th><th class="num">热度</th><th>分类</th><th>说明</th><th></th></tr>`;
+    rows = items.map((t, i) => `<tr data-i="${i}"><td class="num">${esc(t.rank)}</td><td class="title">${esc(t.title)}</td><td class="num">${fmtN(t.heat)}</td><td>${esc(t.category || "")}</td><td class="sub"><div class="clamp">${esc(t.description || "")}</div></td><td style="white-space:nowrap"><a href="${esc(t.url)}" target="_blank" onclick="event.stopPropagation()">打开 ↗</a> <button class="btn ghost" onclick="event.stopPropagation();quick('${esc(t.platform || platform)}','search_posts',{keyword:${J(t.title)}})">搜索</button></td></tr>`);
+  } else if (kind === "users") {
+    head = `<tr><th></th><th>名称</th><th class="num">粉丝</th><th class="num">关注</th><th class="num">作品</th><th>简介</th><th></th></tr>`;
+    rows = items.map((u, i) => `<tr data-i="${i}"><td><img class="avatar" src="${esc(u.avatar_url || "")}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'"></td><td><span class="title">${platform ? "" : logo(u.platform, true) + " "}${esc(u.name)}</span><br><span class="sub mono">${esc(u.id)}</span></td><td class="num">${fmtN(u.metrics?.followers)}</td><td class="num">${fmtN(u.metrics?.following)}</td><td class="num">${fmtN(u.metrics?.posts)}</td><td class="sub"><div class="clamp">${esc(u.bio)}</div></td><td style="white-space:nowrap"><a href="${esc(u.url)}" target="_blank" onclick="event.stopPropagation()">打开 ↗</a> <button class="btn ghost" onclick="event.stopPropagation();quick('${esc(u.platform || platform)}','get_user_posts',{id:${J(u.id)},xsec:${J(xs(u))}})">帖子</button></td></tr>`);
+  } else if (kind === "comments") {
+    renderThread(el, items, platform);
+    return;
+  } else {
+    head = `<tr><th></th><th>标题 / 内容</th><th>作者</th><th class="num">赞</th><th class="num">评论</th><th class="num">播放</th><th>时间</th><th></th></tr>`;
+    rows = items.map((p, i) => { const snippet = (p.content || "").replace(/\s+/g, " ").trim(); return `<tr data-i="${i}"><td>${p.cover_url ? `<img class="thumb" src="${esc(p.cover_url)}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">` : `<span class="thumb empty"></span>`}</td><td><span class="title">${esc(p.title || (snippet.length > 80 ? snippet.slice(0, 80) + "…" : snippet) || "（无标题）")}</span>${p.title ? `<div class="clamp sub">${esc(snippet)}</div>` : ""}<div class="sub mono">${esc(p.id)}</div></td><td style="white-space:nowrap">${platform ? "" : logo(p.platform, true) + " "}${esc(p.author?.name)}</td><td class="num">${fmtN(p.metrics?.likes)}</td><td class="num">${fmtN(p.metrics?.comments)}</td><td class="num">${fmtN(p.metrics?.views)}</td><td class="sub">${fmtT(p.publish_time)}</td><td style="white-space:nowrap"><a href="${esc(p.url)}" target="_blank" onclick="event.stopPropagation()">打开 ↗</a> <button class="btn ghost" onclick="event.stopPropagation();quick('${esc(p.platform || platform)}','get_comments',{id:${J(p.id)},xsec:${J(xs(p))}})">评论</button> <button class="btn ghost" onclick="event.stopPropagation();startDownload('${esc(p.platform || platform)}',${J(p.id)},${J(xs(p))})">下载</button></td></tr>`; });
+  }
+  el.innerHTML = `<table><thead>${head}</thead><tbody>${rows.join("")}</tbody></table>`;
+  el.querySelectorAll("tbody tr").forEach((tr) => tr.addEventListener("click", () => { el.querySelectorAll("tr.sel").forEach((x) => x.classList.remove("sel")); tr.classList.add("sel"); openDrawer(items[Number(tr.dataset.i)]); }));
+}
+
+function commentHtml(c, i, platform, reply) {
+  const n = c.raw?.reply_count ?? c.raw?.replies ?? c.raw?.reply_total ?? c.raw?.sub_comment_count ?? c.raw?.rcount;
+  const can = !reply && (n > 0 || c.raw?.replies_token || c.raw?.sub_comment_has_more || c.raw?.has_more_replies);
+  const av = c.author?.avatar_url ? `<img class="av" src="${esc(c.author.avatar_url)}" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=&quot;av ph&quot;>${esc((c.author?.name || "?").slice(0, 1))}</span>'">` : `<span class="av ph">${esc((c.author?.name || "?").slice(0, 1))}</span>`;
+  const postId = c.post_id || $("q-id").value;
+  return `<div class="cmt${reply ? " reply" : ""}" data-i="${i}" data-cid="${esc(c.id)}">${av}<div><div class="who"><span class="n">${esc(c.author?.name || "匿名")}</span><span class="t mono">${esc(c.author?.id || "")}</span><span class="t">${fmtT(c.publish_time)}</span>${c.raw?.is_creator || c.raw?.is_submitter ? `<span class="pill accent">作者</span>` : ""}</div><div class="txt">${esc(c.content)}</div><div class="meta"><span>赞 <b class="num">${fmtN(c.likes)}</b></span>${n != null && !reply ? `<span>回复 <b class="num">${fmtN(n)}</b></span>` : ""}${can ? `<button class="btn ghost" onclick="event.stopPropagation();loadReplies(this,'${esc(c.platform || platform)}',${J(postId)},${J(c.id)})">展开回复</button>` : ""}</div></div></div>`;
+}
+function renderThread(el, items, platform) {
+  // top-level comments in order, replies nested under their parent (inline replies from the API included)
+  const byParent = {};
+  for (const c of items) if (c.parent_id) (byParent[c.parent_id] ||= []).push(c);
+  const roots = items.filter((c) => !c.parent_id);
+  const html = roots.map((c, i) => commentHtml(c, i, platform, false) + (byParent[c.id] || []).map((r) => commentHtml(r, items.indexOf(r), platform, true)).join("")).join("");
+  const orphans = items.filter((c) => c.parent_id && !roots.some((r) => r.id === c.parent_id));
+  el.innerHTML = `<div class="thread">${html}${orphans.map((r) => commentHtml(r, items.indexOf(r), platform, true)).join("")}</div>`;
+  el.querySelectorAll(".cmt").forEach((d) => d.addEventListener("click", () => { el.querySelectorAll(".cmt.sel").forEach((x) => x.classList.remove("sel")); d.classList.add("sel"); openDrawer(items[Number(d.dataset.i)]); }));
+}
+async function loadReplies(btn, platform, postId, cid, cursor) {
+  const host = btn.closest(".cmt"); btn.disabled = true; btn.textContent = "加载中…";
+  try {
+    const q = new URLSearchParams(); if (cursor) q.set("cursor", cursor); if ($("q-xsec").value.trim()) q.set("xsec_token", $("q-xsec").value.trim());
+    const r = await api(`/${platform}/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(cid)}/replies${q.toString() ? "?" + q : ""}`);
+    // skip replies the API already delivered inline with the comment list
+    const shown = new Set([...host.parentElement.querySelectorAll(".cmt.reply")].map((d) => d.dataset.cid));
+    const replies = (r.data?.items || []).filter((c) => !shown.has(String(c.id)));
+    const base = state.results.length; state.results = state.results.concat(replies);
+    let anchor = host; while (anchor.nextElementSibling && anchor.nextElementSibling.classList.contains("reply")) anchor = anchor.nextElementSibling;
+    anchor.insertAdjacentHTML("afterend", replies.map((c, k) => commentHtml(c, base + k, platform, true)).join("") + (r.cursor ? `<div class="replies-more"><button class="btn ghost" onclick="loadReplies(this,'${esc(platform)}',${J(postId)},${J(cid)},${J(r.cursor)})">更多回复</button></div>` : ""));
+    host.parentElement.querySelectorAll(".cmt.reply").forEach((d) => { if (!d.dataset.bound) { d.dataset.bound = "1"; d.addEventListener("click", () => openDrawer(state.results[Number(d.dataset.i)])); } });
+    btn.textContent = replies.length ? `已展开 ${replies.length} 条` : "没有回复"; if (btn.closest(".replies-more")) btn.closest(".replies-more").remove();
+  } catch (e) { btn.disabled = false; btn.textContent = "展开回复"; toast(e.message, true); }
+}
+function openDrawer(it) {
+  if (!it) return; state.selected = it; const kind = itemKind(it); const pid = it.platform || state.platform;
+  $("dr-logo").outerHTML = logo(pid, true, "dr-logo");
+  $("dr-title").textContent = it.title || it.name || it.content?.slice(0, 60) || it.id;
+  const m = it.metrics || {}; const parts = []; const xs = it.raw?.xsec_token || "";
+  if (it.cover_url) parts.push(`<img class="cover" src="${esc(it.cover_url)}" referrerpolicy="no-referrer" onerror="this.remove()">`);
+  if (it.avatar_url && kind === "users") parts.push(`<img class="avatar" style="width:64px;height:64px" src="${esc(it.avatar_url)}" referrerpolicy="no-referrer" onerror="this.remove()">`);
+  if (kind === "posts") parts.push(`<div class="metrics">${[["赞", m.likes], ["评论", m.comments], ["分享", m.shares], ["收藏", m.collects], ["播放", m.views]].filter((x) => x[1] != null).map(([n, v]) => `<div><b class="num">${fmtN(v)}</b><span>${n}</span></div>`).join("")}</div>`);
+  if (kind === "users") parts.push(`<div class="metrics">${[["粉丝", m.followers], ["关注", m.following], ["作品", m.posts]].filter((x) => x[1] != null).map(([n, v]) => `<div><b class="num">${fmtN(v)}</b><span>${n}</span></div>`).join("")}</div>`);
+  const kv = [["平台", esc(pname(pid))], ["id", `<span class="mono">${esc(it.id)}</span>`], ["作者", it.author ? `${esc(it.author.name)} <span class="sub mono">${esc(it.author.id)}</span>` : null], ["时间", esc(it.publish_time)], ["链接", it.url ? `<a href="${esc(it.url)}" target="_blank">${esc(it.url)}</a>` : null], ["标签", esc((it.tags || []).join("、")) || null], ["简介", esc(it.bio) || null]].filter((x) => x[1]);
+  parts.push(`<dl class="kv">${kv.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`);
+  if (it.content) parts.push(`<div style="white-space:pre-wrap;font-size:13px;max-height:220px;overflow:auto">${esc(it.content)}</div>`);
+  if (it.media?.length) parts.push(`<div><div class="sub" style="margin-bottom:6px">媒体 ${it.media.length} 个</div>${it.media.map((mm, i) => `<div class="sub" style="display:flex;gap:8px;align-items:center"><span class="pill neutral">${esc(mm.type)}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" class="mono">${esc(mm.url)}</span>${mm.width ? `<span>${mm.width}×${mm.height}</span>` : ""}<button class="btn ghost" onclick="startDownload('${esc(pid)}',${J(it.id)},${J(xs)},${i})">下载</button></div>`).join("")}</div>`);
+  const actions = [];
+  if (kind === "posts") { actions.push(`<button class="btn" onclick="quick('${esc(pid)}','get_comments',{id:${J(it.id)},xsec:${J(xs)}})">评论</button>`); if (it.media?.length) actions.push(`<button class="btn primary" onclick="startDownload('${esc(pid)}',${J(it.id)},${J(xs)})">下载全部媒体</button>`); if (it.author?.id) actions.push(`<button class="btn" onclick="quick('${esc(pid)}','get_user_posts',{id:${J(it.author.id)},xsec:${J(it.author.raw?.xsec_token || "")}})">作者的帖子</button>`); }
+  if (kind === "users") actions.push(`<button class="btn primary" onclick="quick('${esc(pid)}','get_user_posts',{id:${J(it.id)},xsec:${J(xs)}})">TA 的帖子</button>`);
+  if (actions.length) parts.push(`<div style="display:flex;gap:8px;flex-wrap:wrap">${actions.join("")}</div>`);
+  parts.push(`<details><summary>原始 JSON</summary><pre>${esc(JSON.stringify(it, null, 2))}</pre></details>`);
+  $("dr-body").innerHTML = parts.join(""); $("drawer").classList.add("open"); $("scrim").classList.add("open");
+}
+function closeDrawer() { $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); }
+document.addEventListener("keydown", (e) => e.key === "Escape" && closeDrawer());
+
+function exportJSON(items, name) { if (!items.length) return toast("没有数据可导出", true); saveBlob(`${name}-${Date.now()}.json`, JSON.stringify(items, null, 2), "application/json"); }
+function flat(it) {
+  const k = itemKind(it);
+  if (k === "topics") return { rank: it.rank, platform: it.platform, title: it.title, heat: it.heat, category: it.category, description: it.description, url: it.url };
+  if (k === "users") return { id: it.id, platform: it.platform, name: it.name, url: it.url, followers: it.metrics?.followers, following: it.metrics?.following, posts: it.metrics?.posts, bio: it.bio, avatar_url: it.avatar_url, xsec_token: it.raw?.xsec_token };
+  if (k === "comments") return { id: it.id, platform: it.platform, post_id: it.post_id, parent_id: it.parent_id, author_id: it.author?.id, author_name: it.author?.name, content: it.content, likes: it.likes, publish_time: it.publish_time };
+  return { id: it.id, platform: it.platform, type: it.type, title: it.title, content: it.content, author_id: it.author?.id, author_name: it.author?.name, url: it.url, likes: it.metrics?.likes, comments: it.metrics?.comments, shares: it.metrics?.shares, collects: it.metrics?.collects, views: it.metrics?.views, publish_time: it.publish_time, cover_url: it.cover_url, media_urls: (it.media || []).map((m) => m.url).join(" | "), tags: (it.tags || []).join(" | "), xsec_token: it.raw?.xsec_token };
+}
+function exportCSV(items, name) {
+  if (!items.length) return toast("没有数据可导出", true);
+  const rows = items.map(flat); const cols = Object.keys(rows[0]);
+  const cell = (v) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  saveBlob(`${name}-${Date.now()}.csv`, "﻿" + [cols.join(","), ...rows.map((r) => cols.map((c) => cell(r[c])).join(","))].join("\r\n"), "text/csv;charset=utf-8");
+}
+
+let collectTimer;
+async function loadCollects() {
+  clearTimeout(collectTimer);
+  try {
+    const r = (await api("/collects?limit=50")).data; let active = false;
+    $("collect-list").innerHTML = r.length ? r.map((t) => { const res = t.result || {}; const p = t.params || {}; if (t.status === "running" || t.status === "queued") active = true; const pct = res.limit ? Math.min(100, Math.round((res.count || 0) / res.limit * 100)) : 0;
+      return `<div class="dl"><div style="display:flex;gap:8px;align-items:center">${logo(t.platform, true)}<span style="flex:1">${esc(pname(t.platform))} · ${esc(actionName(p.action))} <span class="sub">${esc(p.params?.keyword || p.params?.post_id || p.params?.id || "")}</span></span>${statusPill(t)}</div><div class="meter"><i style="width:${pct}%"></i></div><div class="sub" style="display:flex;justify-content:space-between;gap:8px"><span class="num">${res.count || 0} / ${res.limit || "?"} 条 · ${res.pages || 0} 页${res.stopped_by ? " · " + ({ limit: "够数", no_more: "到底", max_pages: "页数上限", error: "出错", cancelled: "取消" }[res.stopped_by] || res.stopped_by) : ""}</span><span>${res.error ? `<span style="color:var(--bad)">${esc(res.error.message).slice(0, 80)}</span> ` : ""}${t.status === "done" ? `<button class="btn ghost" onclick="showCollect('${t.id}')">查看结果</button>` : ""}${t.status === "running" || t.status === "queued" ? `<button class="btn ghost" onclick="cancelTask('${t.id}')">取消</button>` : ""}</span></div></div>`; }).join("") : `<div class="empty">还没有连续拉取任务。在「查询」里把条数切到"连续到 N 条"。</div>`;
+    $("n-collect").textContent = r.filter((t) => t.status === "running" || t.status === "queued").length || "";
+    if (active && state.page === "collect") collectTimer = setTimeout(loadCollects, 2000);
+  } catch (e) { toast(e.message, true); }
+}
+async function showCollect(id) {
+  const t = (await api(`/tasks/${id}`)).data; const res = t.result || {}; const p = t.params || {};
+  showPage("query"); pushHistory(); selectPlatform(t.platform);
+  if (p.action && [...$("q-action").options].some((o) => o.value === p.action)) $("q-action").value = p.action;
+  const prm = p.params || {}; $("q-keyword").value = prm.keyword || ""; $("q-id").value = prm.id || prm.post_id || ""; $("q-cid").value = prm.comment_id || ""; $("q-xsec").value = prm.xsec_token || ""; syncForm();
+  state.results = res.items || []; state.cursor = null; state.resultKind = res.kind === "topics" ? "topics" : itemKind(state.results[0]);
+  $("q-count").textContent = `${state.results.length} 条 / ${res.pages || 0} 页`; $("q-info").textContent = "";
+  renderItems($("q-results"), state.results, state.resultKind, t.platform);
+  setContext({ platform: t.platform, action: p.action, key: ctxKey(p.action || "", prm), source: `连续拉取 ${id}`, form: formSnapshot() });
+}
+async function startDownload(platform, id, xsec, mediaIndex) {
+  if (!id) return toast("请填写帖子 id", true);
+  try { const body = {}; if (xsec) body.xsec_token = xsec; if (mediaIndex != null) body.media_index = mediaIndex; const r = await api(`/${platform}/posts/${encodeURIComponent(id)}/download`, { method: "POST", body: JSON.stringify(body) }); toast(`下载任务 ${r.task_id} 已开始`); closeDrawer(); showPage("downloads"); } catch (e) { toast(e.message, true); }
+}
+async function startDownloadFromForm() {
+  let id = $("d-id").value.trim(), platform = $("d-platform").value, xsec = $("d-xsec").value.trim();
+  if (/^https?:\/\//.test(id) || /\.[a-z]{2,}\//.test(id)) { try { const r = (await api("/resolve?q=" + encodeURIComponent(id))).data; if (r.kind === "post") { platform = r.platform; id = r.id; xsec = r.xsec_token || xsec; } else return toast("这个链接不是帖子", true); } catch (e) { return toast(e.message, true); } }
+  startDownload(platform, id, xsec);
+}
+let dlTimer;
+async function loadDownloads() {
+  clearTimeout(dlTimer);
+  try {
+    const r = (await api("/downloads?limit=50")).data; let active = false;
+    for (const t of r) { if (t.status === "running" || t.status === "queued") active = true; if (t.result?.dir && !$("d-dir").textContent) $("d-dir").textContent = t.result.dir.replace(/[\\/][^\\/]+$/, ""); }
+    $("d-list").innerHTML = r.length ? r.map((t) => dlRow(t, t.status === "running" || t.status === "queued" ? `<button class="btn ghost" onclick="cancelTask('${t.id}')">取消</button>` : "")).join("") : `<div class="empty">还没有下载任务。在查询结果或详情里点「下载」，或在上面填帖子 id、粘链接。</div>`;
+    $("n-downloads").textContent = r.filter((t) => t.status === "running" || t.status === "queued").length || "";
+    if (active && state.page === "downloads") dlTimer = setTimeout(loadDownloads, 2000);
+  } catch (e) { toast(e.message, true); }
+}
+async function cancelTask(id) { try { await api(`/tasks/${id}/cancel`, { method: "POST" }); toast("已取消"); loadDownloads(); loadCollects(); loadTasks(); } catch (e) { toast(e.message, true); } }
+let taskLimit = 100;
+async function loadTasks(more) {
+  try {
+    taskLimit = more ? taskLimit + 100 : 100;
+    const q = new URLSearchParams({ limit: String(taskLimit) }); if ($("t-platform").value) q.set("platform", $("t-platform").value); if ($("t-status").value) q.set("status", $("t-status").value);
+    const all = (await api("/tasks?" + q)).data;
+    const r = $("t-debug").checked ? all : all.filter((t) => !isDebugTask(t));
+    $("t-more").hidden = all.length < taskLimit;
+    $("t-list").innerHTML = r.length ? `<table><thead><tr><th>时间</th><th>id</th><th>平台</th><th>动作</th><th>状态</th><th>参数 / 错误</th><th></th></tr></thead><tbody>${r.map((t) => { const params = Object.entries(t.params || {}).filter(([k]) => !k.startsWith("_")).map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`).join(" ").slice(0, 140); return `<tr style="cursor:default"><td class="sub" style="white-space:nowrap">${fmtT(t.created_at)}</td><td class="mono">${t.id}</td><td style="white-space:nowrap">${logo(t.platform, true)} ${esc(pname(t.platform))}</td><td style="white-space:nowrap">${esc(actionName(t.action))}</td><td>${statusPill(t)}</td><td class="sub" title="${esc(params)}">${esc(taskSummary(t) || params)}${t.error ? `<br><span style="color:var(--bad)">${esc(t.error.code)}: ${esc(t.error.message)}</span>` : ""}</td><td>${t.status === "running" || t.status === "queued" ? `<button class="btn ghost" onclick="cancelTask('${t.id}')">取消</button>` : ""}</td></tr>`; }).join("")}</tbody></table>` : `<div class="empty">没有任务</div>`;
+  } catch (e) { toast(e.message, true); }
+}
+async function loadCache() {
+  try {
+    const q = new URLSearchParams({ kind: $("c-kind").value, limit: $("c-limit").value }); if ($("c-platform").value) q.set("platform", $("c-platform").value);
+    $("c-results").innerHTML = `<div class="empty">加载中…</div>`;
+    const r = (await api("/items?" + q)).data; state.cache = r; $("n-cache").textContent = r.length ? fmtN(r.length) : "";
+    renderItems($("c-results"), r, $("c-kind").value, $("c-platform").value || null);
+  } catch (e) { toast(e.message, true); }
+}
+
+
+// ---- 接口 page ------------------------------------------------------------------------------------
+// The REST list is derived from /openapi.json, filtered by what the selected platform really
+// supports (its capabilities), with Chinese names / descriptions kept here. The matrix is the
+// honest overview: capability present = verified in a real browser, except the UNVERIFIED ones.
+let apiDoc = null, mcpDoc = null;
+const CAP_COLS = [["search_posts", "搜索内容"], ["search_users", "搜索用户"], ["get_post", "帖子详情"], ["get_comments", "评论"], ["get_replies", "评论回复"], ["get_user", "用户资料"], ["get_user_posts", "用户帖子"], ["get_feed", "推荐流"], ["get_trending", "热榜"], ["download", "下载"]];
+const UNVERIFIED = { weixin_mp: { get_user_posts: "账号被 freq control 冻结，等解冻录样本" } };
+const NO_DOWNLOAD = new Set(["weixin_channels"]);
+const PLATFORM_NOTES = {
+  weixin_channels: "视频号网页版只有创作者后台和分享链接播放页，没有公域搜索、详情、评论入口，这些接口都不可用；后台数据接口留到以后做。",
+  weixin_mp: "公众号没有推荐流和热榜；搜索只能搜公众号（账号），文章列表靠 appmsg 接口，账号解冻后才能验证。",
+  xiaohongshu: "小红书的笔记和用户 id 要配合链接里的 xsec_token；热榜实际是搜索框的\"猜你想搜\"，个性化。",
+  kuaishou: "快手网页版的评论列表不带子评论信息，没有评论回复；也没找到公开热榜。",
+  youtube: "YouTube 不登录也能用公开内容；下载走 yt-dlp 并沿用系统代理。",
+  linkedin: "LinkedIn 新版首页和搜索是服务端驱动 UI，没有可捕获的实体数据，首页流、帖子详情、个人资料、人员搜索在标签页里调用老的 voyager 接口（带 csrf 头）；作者动态页和帖子详情页还是老版页面，作者动态、评论、评论回复靠捕获它自己的请求。没有内容搜索和热榜。作者动态对非联系人只给 20 条；人员搜索的 queryId 会随站点部署变化。",
+  instagram: "Instagram 只捕获站点自己发的 GraphQL 请求，扩展不主动调接口。帖子详情和评论第一页是页面内嵌数据；用户搜索通过在搜索框里输入触发，没有翻页（网页版本身不提供更多账号结果）。风控最严的平台，整页加载配额 10 分钟 10 次。",
+  toutiao: "头条所有接口都带站点自己算的签名，扩展只打开页面、捕获站点自己发的请求。搜索走 so.toutiao.com 的资讯标签；评论第二页起要打开评论抽屉，抽屉在未登录时可能不可用。",
+  reddit: "Reddit 走公开的 .json 接口，不需要签名；不登录也能用，登录后首页流才是个性化的。评论一次最多 100 条顶层，更多的要 morechildren 接口，暂不做。",
+  zhihu: "知乎几乎所有内容都要登录。帖子 id 形如 answer:123、article:123、question:123；评论会内联带上每条的前几条回复。",
+  tiktok: "TikTok 需要能访问的网络（浏览器走系统代理即可）。视频只给 id 时，后端先通过公开的 oembed 接口换成作者名再打开页面。评论要先在页面里点开评论面板才会请求，扩展会自动点。",
+};
+const NOUN = { bilibili: "视频", xiaohongshu: "笔记", douyin: "视频", kuaishou: "视频", weixin_mp: "文章", youtube: "视频", x: "推文", weixin_channels: "视频", reddit: "帖子", zhihu: "回答 / 文章 / 问题", tiktok: "视频", toutiao: "文章", instagram: "帖子", linkedin: "动态" };
+const USER_ID = { reddit: "用户名（不带 u/）", zhihu: "url_token（主页链接 /people/ 后面那段）", tiktok: "@uniqueId（不带 @ 也行）", bilibili: "mid（数字）", xiaohongshu: "用户 id，配合链接里的 xsec_token", douyin: "sec_uid（主页链接 /user/ 后面那串）", kuaishou: "用户 id（主页链接 /profile/ 后面那段）", weixin_mp: "公众号的 fakeid（搜索公众号结果里的 id）", youtube: "@handle 或 UC 开头的频道 id", x: "用户名（不带 @）", toutiao: "作者主页 token（/c/user/token/ 后面那串 MS4w… ）", instagram: "用户名（不带 @）", linkedin: "个人主页 vanity（/in/ 后面那段）" };
+const ORDERS_DESC = { bilibili: "order 可选 totalrank 综合、click 播放、pubdate 最新", x: "order 可选 live 最新、top 热门", reddit: "order 可选 relevance 相关、hot、top、new、comments" };
+const DL_DESC = { reddit: "i.redd.it 图片直链；v.redd.it 视频是分离的 DASH，取视频和音轨用 ffmpeg 合并，无声视频只留视频。", tiktok: "视频地址绑定浏览器 cookie，后端直连 403，交给 yt-dlp 并沿用系统代理。", bilibili: "有 ffmpeg 时取 DASH 最高画质并合并音视频，没有时取单文件 mp4；mode 可强制 dash 或 mp4。", youtube: "交给 yt-dlp（已装进后端环境），最高画质并合并，沿用系统代理。", weixin_mp: "下载文章里的图片（直链）。", xiaohongshu: "视频取最高清晰度的直链，图片取原图；要带 xsec_token。", douyin: "视频直链，无水印版本以站点给的为准；图文帖下载全部图片。", kuaishou: "视频直链。", x: "视频取最高码率的 mp4，图片取原图。" };
+const ROUTE_INFO = {
+  "GET /api/v1/{platform}/search": { name: "搜索", cap: "search", desc: (pid, caps) => {
+    const kinds = [caps.has("search_posts") ? `搜${NOUN[pid] || "内容"}（type=post）` : null, caps.has("search_users") ? "搜账号（type=user）" : null].filter(Boolean);
+    if (!caps.has("search_posts")) return `只能搜账号（type=user），${pid === "weixin_mp" ? "也就是按名称搜公众号" : "不能搜内容"}。带 cursor 翻页。`;
+    return `${kinds.join("，")}，type 默认 post。${ORDERS_DESC[pid] ? ORDERS_DESC[pid] + "。" : ""}带 cursor 翻页。${pid === "xiaohongshu" ? "搜索接口容易触发风控，别连续大量调用。" : ""}`;
+  } },
+  "GET /api/v1/{platform}/posts/{post_id}": { name: "帖子详情", cap: "get_post", desc: (pid) => `一条${NOUN[pid] || "帖子"}：标题、正文、作者、指标、媒体地址。${pid === "xiaohongshu" ? "post_id 是笔记 id，必须带列表项里的 xsec_token。" : pid === "bilibili" ? "post_id 用 BV 号或 av 号。" : pid === "weixin_mp" ? "post_id 是文章链接 /s/ 后面那段。" : pid === "youtube" ? "post_id 是视频 id（watch?v= 后面 11 位）。" : pid === "x" ? "post_id 是推文 id（status/ 后面的数字）。" : ""}` },
+  "GET /api/v1/{platform}/posts/{post_id}/comments": { name: "评论", cap: "get_comments", desc: (pid) => `一级评论列表，带 cursor 翻页。${pid === "bilibili" ? "mode 选排序：3 热门（默认）、2 时间。" : pid === "xiaohongshu" ? "要带 xsec_token。" : pid === "reddit" ? "mode 选排序：confidence（默认）、top、new、controversial、old、qa；每页最多 100 条顶层，cursor 翻页走 morechildren；回复以\"有更多回复\"标记。" : pid === "zhihu" ? "每条评论内联带前几条回复（parent_id 已挂好）。" : ""}` },
+  "GET /api/v1/{platform}/posts/{post_id}/comments/{comment_id}/replies": { name: "评论的回复", cap: "get_replies", desc: (pid) => `一条评论下的回复（楼中楼），parent_id 是该评论，带 cursor 翻页。${["douyin", "xiaohongshu"].includes(pid) ? "接口带签名，扩展会在页面里找到那条评论点\"展开回复\"再捕获，每次十几秒。" : pid === "youtube" ? "用评论自带的 continuation，很快。" : pid === "x" ? "就是那条回复自己的详情页。" : ""}` },
+  "GET /api/v1/{platform}/users/{user_id}": { name: "用户资料", cap: "get_user", desc: (pid) => `资料和粉丝、关注、作品数。user_id 用 ${USER_ID[pid] || "平台的用户 id"}。` },
+  "GET /api/v1/{platform}/users/{user_id}/posts": { name: "用户的帖子", cap: "get_user_posts", desc: (pid) => `某个账号发布的${NOUN[pid] || "内容"}，最新在前，带 cursor 翻页。${ORDERS_DESC[pid] && pid === "bilibili" ? "order 可选 pubdate 最新、click 播放。" : ""}${pid === "weixin_mp" ? "走公众号后台的 appmsg 接口，每页 5 篇，账号有频率限制。" : ""}` },
+  "GET /api/v1/{platform}/feed": { name: "推荐流", cap: "get_feed", desc: (pid) => `登录账号自己的${pid === "youtube" ? "首页" : "推荐"}信息流，带 cursor 翻页。` },
+  "GET /api/v1/{platform}/trending": { name: "热榜", cap: "get_trending", desc: (pid) => ({ bilibili: "综合热门视频，data.kind=posts，带 cursor 翻页。", youtube: "Trending 页的视频，data.kind=posts，带 cursor 翻页。", douyin: "抖音热搜话题，data.kind=topics，每条有 rank、title、heat（热度值）、url 和\"新 / 热 / 爆\"标签。", x: "趋势话题，data.kind=topics，heat 从\"12.3K posts\"这类描述解析。", xiaohongshu: "网页版没有公开热榜，这里给的是搜索框的\"猜你想搜\"，个性化推荐，data.kind=topics。" }[pid] || "热门列表。") },
+  "POST /api/v1/{platform}/posts/{post_id}/download": { name: "下载媒体", cap: "download", desc: (pid) => `把这条${NOUN[pid] || "帖子"}的媒体下到 data/downloads/${pid}/{作者}/。${DL_DESC[pid] || ""}默认立即返回任务，wait: true 阻塞到完成；media_index 只下某一个媒体。` },
+  "POST /api/v1/{platform}/collect": { name: "连续拉取", cap: "list", desc: (pid, caps) => `后台连续翻页，直到 limit 条、站点没有更多或 max_pages。${pid} 可用的列表动作：${[...LIST_CAPS].filter((c) => caps.has(c) && !UNVERIFIED[pid]?.[c]).map((c) => `${c}（${CAP_COLS.find((x) => x[0] === c)?.[1]}）`).join("、")}。params 是该动作的参数，结果里有 items、pages、complete、stopped_by。` },
+  "POST /api/v1/{platform}/resume": { name: "恢复队列", cap: null, desc: "队列因验证码或限流暂停后，在浏览器里处理完，调这个恢复。" },
+  "GET /api/v1/{platform}/capabilities": { name: "平台能力", cap: null, desc: "这个平台支持的动作、执行方式（call 在已开页面里发接口，navigate 新开页面）和超时。" },
+  "GET /api/v1/tasks": { name: "任务列表", desc: "最近的任务，可按 platform、status、action（collect、download 等）筛选。" },
+  "GET /api/v1/tasks/{task_id}": { name: "任务详情", desc: "任务状态、参数、结果和错误。下载和连续拉取的进度也在 result 里。" },
+  "POST /api/v1/tasks/{task_id}/cancel": { name: "取消任务", desc: "取消排队或执行中的任务，下载和连续拉取都可以。" },
+  "GET /api/v1/downloads": { name: "下载任务列表", desc: "最近的下载任务，每个文件的进度、路径和错误。" },
+  "GET /api/v1/collects": { name: "连续拉取任务列表", desc: "最近的连续拉取任务：条数、页数、结束原因。" },
+  "GET /health": { name: "健康检查", desc: "后端活着就返回 ok 和版本号。" },
+  "GET /api/v1/status": { name: "整体状态", desc: "后端版本、扩展连接、各平台登录状态和标签页、每个队列的排队、暂停、页面加载配额用量。" },
+  "GET /api/v1/platforms": { name: "平台列表", desc: "所有平台：id、名称、登录地址和提示、域名、风险等级、限速、能力。" },
+  "GET /api/v1/resolve": { name: "识别链接", desc: "把粘进来的链接或 id 变成 platform、kind（post / user / keyword / short_link）和 id，小红书链接会带出 xsec_token。控制台顶部的输入框就是它。" },
+  "GET /api/v1/items": { name: "本地缓存", desc: "查询过的帖子、用户、评论（kind）都存在本地 SQLite，按最近更新排序，可按平台筛选。" },
+  "GET /api/v1/items/{kind}/{platform}/{item_id}": { name: "缓存里的一条", desc: "按类型、平台、id 取缓存里的一条记录。" },
+  "GET /api/v1/mcp/tools": { name: "MCP 工具列表", desc: "MCP server 暴露的 tool 和 resource，本页 MCP 部分的数据来源。" },
+  "GET /api/v1/tasks/cookies": { name: "站点 cookie 名", dev: true, desc: "浏览器为某个站点持有的 cookie 名和域（不含值），用来挑登录标记。" },
+  "POST /api/v1/tasks/echo": { name: "扩展回声", dev: true, desc: "经扩展的 background 走一圈，验证后端和扩展的链路。" },
+  "POST /api/v1/{platform}/echo": { name: "页面回声", dev: true, cap: null, desc: "在该平台的一个标签页里执行 echo，验证页面级路由。" },
+  "POST /api/v1/{platform}/record": { name: "录制模式", dev: true, cap: null, desc: "打开后，该平台标签页里的接口响应都会存到 data/raw/，用来采样和排查。" },
+  "GET /api/v1/{platform}/raw": { name: "原始响应", dev: true, cap: null, desc: "录制模式存下的原始响应清单，按日期。" },
+  "POST /api/v1/{platform}/run": { name: "执行任意动作", dev: true, cap: null, desc: "直接跑该平台声明的能力或通用页面动作（fetch、wait_capture、read_global、navigate 等），raw: true 返回原始响应。采样脚本用的就是它。" },
+};
+const MCP_ZH = { status: "整体状态", list_platforms: "平台列表和登录状态，先调它", get_capabilities: "某平台的能力", resume: "恢复暂停的队列", get_task: "查任务", search: "搜索内容或用户", get_post: "帖子详情", get_comments: "评论", get_replies: "评论的回复", get_user: "用户资料", get_user_posts: "用户的帖子", get_feed: "推荐流", get_trending: "热榜", collect: "连续拉取多页", download: "下载媒体", list_downloads: "下载任务列表" };
+const LIST_CAPS = new Set(["search_posts", "search_users", "get_comments", "get_replies", "get_user_posts", "get_feed", "get_trending"]);
+
+function apiPlatform() { return $("api-platform").value || state.platforms[0]?.id || "bilibili"; }
+function capsOf(pid) { return new Set((plat(pid)?.capabilities || []).map((c) => c.action)); }
+function supports(pid, cap) {
+  if (cap == null) return true;
+  const caps = capsOf(pid);
+  if (cap === "download") return caps.has("get_post") && !NO_DOWNLOAD.has(pid);
+  if (cap === "list") return [...LIST_CAPS].some((c) => caps.has(c) && !UNVERIFIED[pid]?.[c]);
+  if (cap === "search") return caps.has("search_posts") || caps.has("search_users");  // one route serves both
+  return caps.has(cap);
+}
+async function apiExamples(platform) {
+  const ex = { platform, post_id: "<post_id>", comment_id: "<comment_id>", user_id: "<user_id>", task_id: "<task_id>", item_id: "<id>", kind: "posts", keyword: "露营", q: "https://www.bilibili.com/video/BV1cXNW6XEeC" };
+  try {
+    const posts = (await api(`/items?kind=posts&platform=${platform}&limit=1`)).data;
+    if (posts[0]) { ex.post_id = posts[0].id; if (posts[0].author?.id) ex.user_id = posts[0].author.id; if (posts[0].raw?.xsec_token) ex.xsec_token = posts[0].raw.xsec_token; }
+    const cs = (await api(`/items?kind=comments&platform=${platform}&limit=1`)).data;
+    if (cs[0]) { ex.comment_id = cs[0].id; if (cs[0].post_id) ex.post_id = cs[0].post_id; }
+    const ts = (await api("/tasks?limit=1")).data; if (ts[0]) ex.task_id = ts[0].id;
+  } catch {}
+  return ex;
+}
+function schemaType(sc) { if (!sc) return ""; if (sc.type) return sc.type + (sc.enum ? ` (${sc.enum.join("|")})` : ""); if (sc.anyOf) return sc.anyOf.map(schemaType).filter((x) => x && x !== "null").join(" | "); if (sc.$ref) return sc.$ref.split("/").pop(); return ""; }
+function resolveRef(ref) { return ref?.split("/").slice(1).reduce((o, k) => o?.[k], apiDoc); }
+function bodySchema(op) { const sc = op.requestBody?.content?.["application/json"]?.schema; if (!sc) return null; return sc.$ref ? resolveRef(sc.$ref) : sc.anyOf ? resolveRef(sc.anyOf.find((x) => x.$ref)?.$ref) : sc; }
+function exampleBody(bs) {
+  const body = {};
+  for (const [k, v] of Object.entries(bs.properties || {})) {
+    if (k === "action") body[k] = "search_posts"; else if (k === "params") body[k] = { keyword: "露营" }; else if (k === "limit") body[k] = 100; else if (k === "wait") body[k] = true; else if (k === "payload") body[k] = {}; else if (k === "enabled") body[k] = true; else if (k === "xsec_token") continue;
+    else if ((bs.required || []).includes(k)) body[k] = v.type === "integer" ? 1 : v.type === "boolean" ? true : `<${k}>`;
+  }
+  return body;
+}
+function curlFor(method, path, op, ex) {
+  const p = path.replace(/\{(\w+)\}/g, (_, k) => ex[k] ?? `<${k}>`);
+  const qs = (op.parameters || []).filter((x) => x.in === "query" && (x.required || x.name === "keyword" || (x.name === "xsec_token" && ex.xsec_token))).map((x) => `${x.name}=${encodeURIComponent(ex[x.name] ?? `<${x.name}>`)}`).join("&");
+  const url = `${location.origin}${p}${qs ? "?" + qs : ""}`;
+  let cmd = `curl ${method !== "get" ? "-X " + method.toUpperCase() + " " : ""}"${url}"`;
+  const bs = bodySchema(op);
+  if (bs) cmd += ` -H "content-type: application/json" -d '${JSON.stringify(exampleBody(bs))}'`;
+  return { cmd, url };
+}
+function paramRows(op) {
+  const rows = (op.parameters || []).filter((x) => x.name !== "platform").map((x) => [x.name, `${x.in === "path" ? "路径" : "查询"}${x.required ? "，必填" : ""} · ${schemaType(x.schema)}`]);
+  const bs = bodySchema(op);
+  if (bs?.properties) for (const [k, v] of Object.entries(bs.properties)) rows.push([k, `body${(bs.required || []).includes(k) ? "，必填" : ""} · ${schemaType(v)}${v.default != null ? "，默认 " + JSON.stringify(v.default) : ""}`]);
+  return rows;
+}
+function endpointHtml(method, path, op, info, ex, pid, i) {
+  const shown = esc(path).replace("{platform}", `<b>${esc(pid)}</b>`);
+  const rows = paramRows(op); const { cmd, url } = curlFor(method, path, op, ex); const id = `ep-${method}-${i}`;
+  const tryable = method === "get" && !url.includes("%3C") && !url.includes("<");
+  const todo = typeof info.cap === "string" && UNVERIFIED[pid]?.[info.cap];
+  const desc = typeof info.desc === "function" ? info.desc(pid, capsOf(pid)) : info.desc;
+  return `<details class="ep" id="${id}"><summary><span class="method ${method}">${method.toUpperCase()}</span><span class="name">${esc(info.name)}</span><span class="path">${shown}</span><span class="desc">${todo ? `<span class="pill warn">待验证</span> ` : ""}${esc(desc)}</span></summary><div class="body"><div>${esc(desc)}${todo ? `<div class="sub" style="color:var(--warn)">待验证：${esc(todo)}</div>` : ""}</div>${rows.length ? `<div class="params">${rows.map(([k, t]) => `<span class="k">${esc(k)}</span><span class="ty">${esc(t)}</span><span></span>`).join("")}</div>` : ""}<div class="snippet">${esc(cmd)}<button class="btn ghost" onclick="copyText(${J(cmd)})">复制</button></div>${tryable ? `<div><button class="btn" onclick="tryGet('${id}', ${J(url)})">试一下</button></div><pre id="${id}-out" hidden></pre>` : ""}${op.description ? `<div class="en">${esc(op.description)}</div>` : ""}</div></details>`;
+}
+function renderMatrix() {
+  const head = `<tr><th>平台</th>${CAP_COLS.map(([, n]) => `<th>${n}</th>`).join("")}</tr>`;
+  const rows = state.platforms.map((p) => `<tr><td><span class="pcell${PLATFORM_NOTES[p.id] ? " has-tip" : ""}" tabindex="0">${logo(p.id, true)} ${esc(p.name)}${PLATFORM_NOTES[p.id] ? `<span class="tip">${esc(PLATFORM_NOTES[p.id])}</span>` : ""}</span></td>${CAP_COLS.map(([cap]) => { const todo = UNVERIFIED[p.id]?.[cap]; const ok = supports(p.id, cap); return `<td>${todo ? `<span class="todo" title="${esc(todo)}">待验证</span>` : ok ? `<span class="yes">✓</span>` : `<span class="no">–</span>`}</td>`; }).join("")}</tr>`);
+  $("api-matrix").innerHTML = `<thead>${head}</thead><tbody>${rows.join("")}</tbody>`;
+}
+async function loadApi() {
+  try {
+    if (!apiDoc) apiDoc = await (await fetch("/openapi.json")).json();
+    if (!mcpDoc) mcpDoc = (await api("/mcp/tools")).data;
+    $("api-base").textContent = location.origin + "/api/v1";
+    const sel = $("api-platform");
+    if (!sel.options.length) { sel.innerHTML = state.platforms.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join(""); sel.value = state.platform || state.platforms[0]?.id; sel.addEventListener("change", loadApi); }
+    const pid = apiPlatform();
+    renderMatrix();
+    const ex = await apiExamples(pid);
+    const buckets = { data: [], tasks: [], system: [], dev: [] };
+    let i = 0;
+    for (const [path, ops] of Object.entries(apiDoc.paths)) for (const [method, op] of Object.entries(ops)) {
+      if (path.startsWith("/api/v1/internal") || path === "/") continue;
+      const key = `${method.toUpperCase()} ${path}`; const info = ROUTE_INFO[key] || { name: op.summary || path, desc: op.description || "", cap: null };
+      const perPlatform = path.includes("{platform}");
+      if (perPlatform && !supports(pid, info.cap)) continue;
+      const html = endpointHtml(method, path, op, info, ex, pid, i++);
+      if (info.dev) buckets.dev.push(html);
+      else if (perPlatform && info.cap != null) buckets.data.push(html);
+      else if (path.includes("/tasks") || path.includes("/downloads") || path.includes("/collects")) buckets.tasks.push(html);
+      else buckets.system.push(html);  // incl. per-platform housekeeping: capabilities, resume
+    }
+    const usable = CAP_COLS.filter(([c]) => supports(pid, c) && !UNVERIFIED[pid]?.[c]).map(([, n]) => n);
+    $("api-data-note").innerHTML = PLATFORM_NOTES[pid] ? `<p>${esc(PLATFORM_NOTES[pid])}</p>` : "";
+    $("api-data").innerHTML = buckets.data.length ? buckets.data.join("") : `<div class="empty">${esc(pname(pid))} 没有可用的数据接口。</div>`;
+    if (usable.length) $("api-data-note").innerHTML += `<p>${esc(pname(pid))} 可用：${usable.join("、")}。路径里的 ${esc("{platform}")} 已替换成 <b>${esc(pid)}</b>，示例 id 取自该平台的缓存，能直接复制运行。</p>`;
+    $("api-tasks").innerHTML = buckets.tasks.join("");
+    $("api-system").innerHTML = buckets.system.join("");
+    $("api-dev").innerHTML = buckets.dev.join("");
+    const claudeCmd = "claude mcp add sociallens -- uv run --project <repo>/backend sociallens-mcp";
+    $("mcp-cmd").innerHTML = esc(`# Claude Code 一条命令接入\n${claudeCmd}\n# 手动启动（需要后端已在跑，SOCIALLENS_URL 可改后端地址）\n${mcpDoc.command}`) + `<button class="btn ghost" onclick="copyText(${J(claudeCmd)})">复制</button>`;
+    const tools = mcpDoc.tools.map((t) => {
+      const props = t.input_schema?.properties || {}; const req = new Set(t.input_schema?.required || []);
+      const rows = Object.entries(props).map(([k, v]) => `<span class="k">${esc(k)}</span><span class="ty">${esc(schemaType(v))}${req.has(k) ? "，必填" : v.default != null ? "，默认 " + esc(JSON.stringify(v.default)) : ""}</span><span></span>`).join("");
+      return `<details class="ep"><summary><span class="method">tool</span><span class="name">${esc(MCP_ZH[t.name] || t.name)}</span><span class="path">${esc(t.name)}</span><span class="desc">${esc(t.description)}</span></summary><div class="body">${rows ? `<div class="params">${rows}</div>` : `<div class="sub">无参数</div>`}<div class="en">${esc(t.description)}</div></div></details>`;
+    });
+    const res = [...mcpDoc.resources.map((r) => ({ u: r.uri, d: r.description })), ...mcpDoc.resource_templates.map((r) => ({ u: r.uri_template, d: r.description }))].map((r) => `<details class="ep"><summary><span class="method">resource</span><span class="name">资源</span><span class="path">${esc(r.u)}</span><span class="desc">${esc(r.d || "")}</span></summary><div class="body"><div class="en">${esc(r.d || "")}</div></div></details>`);
+    $("api-mcp").innerHTML = tools.join("") + res.join("");
+  } catch (e) { toast(e.message, true); }
+}
+function copyText(t) { navigator.clipboard.writeText(t).then(() => toast("已复制"), () => toast("复制失败", true)); }
+async function tryGet(id, url) {
+  const out = $(id + "-out"); out.hidden = false; out.textContent = "请求中…";
+  try { const res = await fetch(url); const body = await res.json(); out.textContent = JSON.stringify(body, null, 2).slice(0, 20000); } catch (e) { out.textContent = String(e); }
+}
+
+(async () => {
+  try { await loadPlatforms(); } catch (e) { toast("无法读取平台列表：" + e.message, true); }
+  loadStatus().catch(() => {});
+  const page = location.hash.slice(1); showPage(TITLES[page] ? page : "overview");
+  setInterval(() => { if (state.page === "overview") loadOverview(); else loadStatus().catch(() => {}); }, 15000);
+})();
+</script>
+</body>
+</html>

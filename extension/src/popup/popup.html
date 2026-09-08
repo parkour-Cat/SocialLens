@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>SocialLens</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span class="logo"></span>
+      <strong>SocialLens</strong>
+      <span id="conn" class="pill neutral">连接中…</span>
+    </header>
+
+    <section id="current" class="current" hidden>
+      <span id="cur-logo" class="plogo sm"></span>
+      <div>
+        <div class="t" id="cur-title"></div>
+        <div class="s" id="cur-sub"></div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="open" class="primary">打开控制台</button>
+      <button id="reconnect">重连</button>
+    </div>
+
+    <div id="alerts" class="alerts"></div>
+
+    <section id="platforms" class="list"></section>
+
+    <details class="advanced">
+      <summary>高级设置 <span id="build" class="mono"></span></summary>
+      <label>后端地址
+        <input id="backendUrl" type="text" placeholder="ws://127.0.0.1:17800/ws/extension" spellcheck="false" />
+      </label>
+      <label>Token（通常不需要，仅当后端提示扩展 ID 不匹配时填 data/token 的内容）
+        <input id="token" type="password" placeholder="留空即可" spellcheck="false" />
+      </label>
+      <button id="save">保存并连接</button>
+      <div id="error" class="error"></div>
+    </details>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

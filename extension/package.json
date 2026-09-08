@@ -1,0 +1,19 @@
+{
+  "name": "sociallens-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SocialLens browser extension: captures and executes requests inside logged-in social media tabs",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

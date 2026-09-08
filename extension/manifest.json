@@ -1,0 +1,89 @@
+{
+  "manifest_version": 3,
+  "name": "SocialLens",
+  "version": "0.1.0",
+  "description": "Local social media data gateway. Captures and executes requests inside your own logged-in tabs.",
+  "minimum_chrome_version": "120",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA12Qi4umarGMp+e5Fp44Wr2OjhSLrmVVsy9A3pA7GwPgJs5HB6f1JhqFI+qIw2SZCta7fdua96xs/hfj4rzuIolFO1c95EWpTHevLq64qjo4797HvXbEOCxWS7ZwY/pQKTJ9ROZFBKPnGiDePNxBL2zdd6R0sd8TD3zon6B8QwJu7oNtYKajDbDnPcZ2SMYAnjlKCJnMuQ4JyvR0DHRb91AaVBouh4MAk21pykR8F4EjB22igKkM9/N5nJWnrYAjmY+G/uwan8eICFkz99qL6cmIpOGGhF8X77HV+fH5DazHm28U7spJ7dLhpZklgVfbHn+evWD4ne0SH14MNJLJtOQIDAQAB",
+  "permissions": [
+    "storage",
+    "tabs",
+    "cookies",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:*/*",
+    "https://*.bilibili.com/*",
+    "https://*.xiaohongshu.com/*",
+    "https://*.douyin.com/*",
+    "https://mp.weixin.qq.com/*",
+    "https://*.kuaishou.com/*",
+    "https://channels.weixin.qq.com/*",
+    "https://*.youtube.com/*",
+    "https://x.com/*",
+    "https://*.x.com/*",
+    "https://*.reddit.com/*",
+    "https://*.zhihu.com/*",
+    "https://*.tiktok.com/*",
+    "https://*.instagram.com/*",
+    "https://*.linkedin.com/*",
+    "https://*.toutiao.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.bilibili.com/*",
+        "https://*.xiaohongshu.com/*",
+        "https://*.douyin.com/*",
+        "https://mp.weixin.qq.com/*",
+        "https://*.kuaishou.com/*",
+        "https://channels.weixin.qq.com/*",
+        "https://*.youtube.com/*",
+        "https://x.com/*",
+        "https://*.x.com/*",
+        "https://*.reddit.com/*",
+        "https://*.zhihu.com/*",
+        "https://*.tiktok.com/*",
+        "https://*.instagram.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.toutiao.com/*"
+      ],
+      "js": [
+        "page.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://*.bilibili.com/*",
+        "https://*.xiaohongshu.com/*",
+        "https://*.douyin.com/*",
+        "https://mp.weixin.qq.com/*",
+        "https://*.kuaishou.com/*",
+        "https://channels.weixin.qq.com/*",
+        "https://*.youtube.com/*",
+        "https://x.com/*",
+        "https://*.x.com/*",
+        "https://*.reddit.com/*",
+        "https://*.zhihu.com/*",
+        "https://*.tiktok.com/*",
+        "https://*.instagram.com/*",
+        "https://*.linkedin.com/*",
+        "https://*.toutiao.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SocialLens"
+  }
+}
