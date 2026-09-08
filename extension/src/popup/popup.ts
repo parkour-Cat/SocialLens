@@ -20,6 +20,42 @@ const LOGOS: Record<string, { bg: string; mark: string }> = {
   toutiao: { bg: "#ED4040", mark: "头" },
 };
 
+// ---- i18n: the popup is written in Chinese; English comes from this dictionary. Language follows
+// the browser UI language (chrome.i18n), overridable with localStorage sl_lang = "zh" | "en".
+const LANG: "zh" | "en" = (() => {
+  try {
+    const v = localStorage.getItem("sl_lang");
+    if (v === "zh" || v === "en") return v;
+  } catch {
+    /* storage unavailable */
+  }
+  const ui = (chrome.i18n?.getUILanguage?.() || navigator.language || "").toLowerCase();
+  return ui.startsWith("zh") ? "zh" : "en";
+})();
+const EN: Record<string, string> = {
+  "已连接": "connected", "当前页面": "Current page", "页": "tabs", "无法联系 background": "Cannot reach the background script", "登录后后端才能使用这个页面": "Sign in first, then the backend can use this page",
+  "连接中…": "Connecting…", "打开控制台": "Open console", "重连": "Reconnect", "高级设置": "Advanced", "后端地址": "Backend address", "留空即可": "leave empty", "保存并连接": "Save and connect",
+  "Token（通常不需要，仅当后端提示扩展 ID 不匹配时填 data/token 的内容）": "Token (normally not needed; only when the backend reports an extension id mismatch, paste the content of data/token)",
+  "后端未启动": "backend not running", "已登录": "signed in", "未登录": "not signed in", "后端未连接，此页暂时不能用": "Backend not connected; this page cannot be used yet", "后端可以在这个页面里执行请求": "The backend can run requests in this page", "已暂停": "paused", "录制中": "recording", "去登录 ↗": "Sign in ↗", "恢复": "Resume",
+  "B 站": "Bilibili", "小红书": "Xiaohongshu", "抖音": "Douyin", "快手": "Kuaishou", "公众号": "WeChat Official Accounts", "视频号": "WeChat Channels", "知乎": "Zhihu", "今日头条": "Toutiao",
+  "打开 bilibili.com，右上角登录（扫码或账号密码）": "Open bilibili.com and sign in at the top right (QR code or password)", "打开 douyin.com，右上角登录，用抖音 App 扫码": "Open douyin.com, sign in at the top right by scanning with the Douyin app", "打开 instagram.com 登录（需要能访问 Instagram 的网络）": "Sign in at instagram.com (needs a network that can reach Instagram)", "打开 kuaishou.com，右上角登录，用快手 App 扫码": "Open kuaishou.com, sign in at the top right by scanning with the Kuaishou app", "打开 linkedin.com 登录": "Sign in at linkedin.com", "打开 reddit.com 登录（不登录也能看公开内容，登录后才有个人首页流）": "Sign in at reddit.com (public content works signed out; the home feed needs an account)", "打开 tiktok.com 登录（需要能访问 TikTok 的网络；不登录也能看部分公开内容）": "Sign in at tiktok.com (needs a network that can reach TikTok; some public content works signed out)", "打开 toutiao.com，点右上角登录（不登录也能看公开内容）": "Open toutiao.com and sign in at the top right (public content works signed out)", "打开 channels.weixin.qq.com（视频号网页版），用微信扫码登录": "Open channels.weixin.qq.com and sign in by scanning with WeChat", "打开 mp.weixin.qq.com（公众号后台），用微信扫码登录你自己的公众号；公域搜索和文章列表都走这个后台": "Open mp.weixin.qq.com (the Official Accounts backstage) and sign in to your own account with WeChat; search and article lists go through this backstage", "打开 x.com 登录（几乎所有页面都要求登录）": "Sign in at x.com (nearly every page requires it)", "打开 xiaohongshu.com，用小红书 App 扫码登录": "Open xiaohongshu.com and sign in by scanning with the Xiaohongshu app", "打开 youtube.com，用 Google 账号登录（不登录也能看公开内容）": "Open youtube.com and sign in with a Google account (public content works signed out)", "打开 zhihu.com，扫码或账号登录（几乎所有内容都要求登录）": "Open zhihu.com and sign in by QR code or password (nearly everything requires it)",
+};
+const t = (s: string): string => (LANG === "en" ? (EN[s] ?? s) : s);
+function translateStatic(): void {
+  if (LANG !== "en") return;
+  document.documentElement.lang = "en";
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const k = (n.nodeValue ?? "").trim();
+    if (k && EN[k]) n.nodeValue = n.nodeValue!.replace(k, EN[k]);
+  }
+  for (const el of Array.from(document.querySelectorAll<HTMLElement>("[placeholder]"))) {
+    const v = el.getAttribute("placeholder") ?? "";
+    if (EN[v]) el.setAttribute("placeholder", EN[v]);
+  }
+}
+translateStatic();
+
 function send<T = unknown>(msg: PopupToBg): Promise<T> {
   return chrome.runtime.sendMessage(msg) as Promise<T>;
 }
@@ -61,7 +97,7 @@ function render(s: ExtStatus): void {
   lastRendered = key;
   const conn = $("conn");
   conn.className = `pill ${s.connected ? "ok" : "bad"}`;
-  conn.innerHTML = `<span class="dot ${s.connected ? "ok" : "bad"}"></span>${s.connected ? `已连接 · v${s.backendVersion ?? "?"}` : "后端未启动"}`;
+  conn.innerHTML = `<span class="dot ${s.connected ? "ok" : "bad"}"></span>${s.connected ? `${t("已连接")} · v${s.backendVersion ?? "?"}` : t("后端未启动")}`;
 
   // the tab the user is looking at
   const cur = $("current");
@@ -69,8 +105,8 @@ function render(s: ExtStatus): void {
     cur.hidden = false;
     const holder = $("cur-logo");
     holder.replaceWith(Object.assign(logoEl(s.currentTab.platform, true), { id: "cur-logo" }));
-    $("cur-title").textContent = `当前页面：${s.currentTab.name} · ${s.currentTab.logged_in ? "已登录" : "未登录"}`;
-    $("cur-sub").textContent = !s.connected ? "后端未连接，此页暂时不能用" : s.currentTab.logged_in || !s.currentTab.login_required ? "后端可以在这个页面里执行请求" : "登录后后端才能使用这个页面";
+    $("cur-title").textContent = `${t("当前页面")}：${t(s.currentTab.name)} · ${s.currentTab.logged_in ? t("已登录") : t("未登录")}`;
+    $("cur-sub").textContent = !s.connected ? t("后端未连接，此页暂时不能用") : s.currentTab.logged_in || !s.currentTab.login_required ? t("后端可以在这个页面里执行请求") : t("登录后后端才能使用这个页面");
   } else {
     cur.hidden = true;
   }
@@ -87,10 +123,11 @@ function render(s: ExtStatus): void {
   for (const q of s.alerts ?? []) {
     const a = document.createElement("div");
     a.className = "alert";
-    a.innerHTML = `<span class="dot warn"></span><span>${q.name} 队列已暂停，还剩 ${Math.ceil(q.paused_for_s / 60)} 分钟。先在页面里处理验证码，再恢复。</span>`;
+    const mins = Math.ceil(q.paused_for_s / 60);
+    a.innerHTML = `<span class="dot warn"></span><span>${LANG === "en" ? `${t(q.name)} queue paused, ${mins} min left. Handle the captcha on the page, then resume.` : `${q.name} 队列已暂停，还剩 ${mins} 分钟。先在页面里处理验证码，再恢复。`}</span>`;
     const btn = document.createElement("button");
     btn.className = "small";
-    btn.textContent = "恢复";
+    btn.textContent = t("恢复");
     btn.onclick = async () => {
       btn.disabled = true;
       await send({ type: "popup.resume", platform: q.platform });
@@ -109,21 +146,21 @@ function render(s: ExtStatus): void {
     const dot = document.createElement("span");
     dot.className = `dot ${paused ? "warn" : p.logged_in ? "ok" : "bad"}`;
     const name = document.createElement("span");
-    name.textContent = p.name || id;
+    name.textContent = t(p.name || id);
     const tabs = document.createElement("span");
     tabs.className = "tabs";
-    tabs.textContent = paused ? "已暂停" : p.logged_in ? (p.tab_ids.length ? `${p.tab_ids.length} 页` : "—") : "未登录";
+    tabs.textContent = paused ? t("已暂停") : p.logged_in ? (p.tab_ids.length ? `${p.tab_ids.length} ${t("页")}` : "—") : t("未登录");
     const right = document.createElement("span");
     if (!p.logged_in) {
       const a = document.createElement("a");
       a.href = p.login_url;
       a.target = "_blank";
-      a.title = p.login_hint;
-      a.textContent = "去登录 ↗";
+      a.title = t(p.login_hint);
+      a.textContent = t("去登录 ↗");
       right.appendChild(a);
     } else {
       right.className = "tabs";
-      right.textContent = p.recording ? "录制中" : "";
+      right.textContent = p.recording ? t("录制中") : "";
     }
     el.append(dot, logoEl(id, true), name, tabs, right);
     list.appendChild(el);
@@ -139,7 +176,7 @@ async function refresh(): Promise<void> {
   try {
     render(await send<ExtStatus>({ type: "popup.status" }));
   } catch (e) {
-    $("error").textContent = `无法联系 background: ${String(e)}`;
+    $("error").textContent = `${t("无法联系 background")}: ${String(e)}`;
   }
 }
 

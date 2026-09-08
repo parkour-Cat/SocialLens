@@ -112,6 +112,7 @@
   .results { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; min-width: 0; }
   .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
   .toolbar .sp { flex: 1; }
+  .side .lang { display: flex; gap: 4px; margin-top: 6px; } .side .lang .btn { padding: 2px 8px; font-size: 12px; }
   .chk { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
   .toolbar .ctx { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-weight: 500; }
   .toolbar .ctx:empty { display: none; }
@@ -232,6 +233,7 @@
     <div class="bottom">
       <span id="side-conn"><span class="dot"></span> 连接中…</span>
       <code>MCP: uv run sociallens-mcp</code>
+      <div class="lang"><button class="btn ghost" onclick="setLang('zh')">中文</button><button class="btn ghost" onclick="setLang('en')">English</button></div>
     </div>
   </aside>
 
@@ -338,6 +340,112 @@
 <script src="icons.js"></script>
 <script>
 const API = "/api/v1";
+// ---- i18n -----------------------------------------------------------------------------------------
+// The page is written in Chinese; English is applied as a translation layer over the rendered DOM:
+// exact text nodes through EN, composed strings (counts, times) through EN_RX, and " · "-joined
+// pieces piece by piece. A MutationObserver re-runs it on every render, so templates stay untouched.
+const LANG = (() => { try { const v = localStorage.getItem("sl_lang"); if (v === "zh" || v === "en") return v; } catch {} return /^zh/i.test(navigator.language || "") ? "zh" : "en"; })();
+const ZH = LANG === "zh";
+const Z = (zh, en) => (ZH ? zh : en);
+function setLang(l) { try { localStorage.setItem("sl_lang", l); } catch {} location.reload(); }
+const EN = {
+  "SocialLens 控制台": "SocialLens Console", "概览": "Overview", "查询": "Query", "连续拉取": "Collect", "下载": "Download", "任务": "Tasks", "缓存": "Cache", "接口": "API", "连接中…": "Connecting…",
+  "关键词、帖子或用户链接、id，回车直达": "Keyword, post / user link or id — Enter to go", "最近任务": "Recent tasks", "最近 20 条，15 秒刷新": "Last 20, refreshed every 15 s",
+  "平台": "Platform", "动作": "Action", "关键词": "Keyword", "帖子 id / 用户 id": "Post id / user id", "评论 id": "Comment id", "小红书链接里的 xsec_token": "xsec_token from the Xiaohongshu link", "排序": "Order", "条数": "Count", "一页": "One page", "连续到": "Up to", "条": "items", "下一页": "Next page", "← 返回": "← Back", "还没有结果": "No results yet", "导出 JSON": "Export JSON", "导出 CSV": "Export CSV",
+  "选平台和动作，或直接在上面粘一条链接。": "Pick a platform and an action, or paste a link above.", "连续拉取任务": "Collect tasks", "每 2 秒刷新进行中的": "running ones refresh every 2 s", "刷新": "Refresh", "帖子 id 或链接": "Post id or link", "全部平台": "All platforms", "全部状态": "All statuses", "显示调试动作": "Show debug actions", "加载中…": "Loading…", "加载更多": "Load more",
+  "各平台能用什么": "What each platform supports", "打勾的是有真实样本和测试、在真浏览器里验证过的；": "A check means recorded samples, tests and a real-browser run; ", "待验证": "unverified", "是代码已完成但还没跑通；空的是平台没有。鼠标放在平台图标上看该平台的说明": " means the code exists but has not run through yet; a dash means the platform has no such thing. Hover a platform icon for its notes",
+  "任务与下载": "Tasks and downloads", "长任务立即返回 task_id，之后轮询": "long tasks return a task_id at once; poll it afterwards", "系统与工具": "System and tools", "状态、平台列表、链接识别、本地缓存": "status, platforms, link resolution, local cache", "数据接口": "Data endpoints", "开发调试": "Debugging", "录制模式、原始响应、直接执行任意动作，平时用不到": "recording mode, raw responses, running any action directly; not needed day to day", "给 Claude Code 之类的模型客户端用，独立进程，纯 REST 薄壳": "for model clients such as Claude Code; a separate process, a thin shell over REST", "其他客户端的配置：": "Config for other clients:",
+  "约定": "Conventions", "后端只监听本机": "The backend listens on localhost only", "，没有鉴权，程序直接调。": "; there is no auth, call it directly.", "成功响应是": "A success response is", "，失败是": ", a failure is", "。列表类的": ". For lists,", "是": "is", "，翻页把顶层": "; to page, send the top-level", "原样传回去；cursor 绑定一个浏览器标签页，闲置几分钟后过期（cursor_expired），从第一页重来即可。": "back as is; a cursor is bound to a browser tab and expires after a few idle minutes (cursor_expired) — start again from page one.",
+  "错误码：": "Error codes:", "未登录，": "not signed in, ", "扩展没连上，": "extension not connected, ", "站点要求验证，队列暂停，": "the site wants a captcha and the queue is paused, ", "被限流，": "rate limited, ", "游标过期，": "cursor expired, ", "页面没在时限内给出数据，": "the page gave no data in time, ", "该平台没有这个动作，": "the platform has no such action, ", "对象不存在。": "not found.",
+  "帖子": "Posts", "用户": "Users", "评论": "Comments", "查询过的帖子、用户、评论都会存在本地 SQLite，这里按最近更新排序。": "Everything queried is kept in local SQLite; sorted by last update.", "关闭": "Close",
+  "搜索内容": "Search posts", "搜索用户": "Search users", "帖子详情": "Post detail", "评论的回复": "Replies", "评论回复": "Replies", "用户资料": "User profile", "用户的帖子": "User posts", "用户帖子": "User posts", "推荐流": "Feed", "热榜": "Trending",
+  "综合": "Relevance", "播放": "Views", "最新": "Newest", "热门": "Hot", "时间": "Time", "相关": "Relevant", "最高": "Top", "最佳": "Best", "回答": "Answers", "文章": "Articles",
+  "系统": "System", "的短链接暂时不能直接解析，请打开后复制完整地址": " short links cannot be resolved here yet; open it and copy the full address",
+  "扩展已连接": "extension connected", "扩展未连接": "extension not connected", "后端不可达": "backend unreachable", "扩展没有连上后端：在 chrome://extensions 加载 extension/dist，或点扩展图标里的": "The extension is not connected: load extension/dist at chrome://extensions, or use", "重连": "Reconnect", "恢复": "Resume",
+  "未登录": "Not signed in", "配额等待": "Waiting for budget", "执行中": "Running", "仅后台": "Backstage only", "空闲": "Idle", "去登录 ↗": "Sign in ↗", "分钟": "min", "还没有任务": "No tasks yet", "还没有下载": "No downloads yet", "已恢复队列": "Queue resumed", "打开页面": "Open page", "页": "pages", "续页": "next page", "完成": "Done", "失败": "Failed", "排队": "Queued", "已取消": "Cancelled",
+  "用户 id / @handle / 用户名": "User id / @handle / username", "帖子 id（BV 号、笔记 id、视频 id、推文 id）": "Post id (BV id, note id, video id, tweet id)", "请求中，页面级动作要开标签页，可能要十几秒…": "Working… page actions open a tab and can take ten seconds or more",
+  "，可翻页": ", more pages", "，没有更多": ", no more", "达到条数上限": "reached the item limit", "已到列表末尾": "end of list", "达到页数上限": "reached the page limit", "中途出错，保留已拿到的": "stopped on an error; pages fetched so far are kept",
+  "没有数据": "No data", "话题": "Topic", "热度": "Heat", "分类": "Category", "说明": "Note", "打开 ↗": "Open ↗", "搜索": "Search", "名称": "Name", "粉丝": "Followers", "关注": "Following", "作品": "Posts", "简介": "Bio", "标题 / 内容": "Title / content", "作者": "Author", "赞": "Likes", "（无标题）": "(untitled)", "匿名": "anonymous", "回复": "Replies", "展开回复": "Show replies", "更多回复": "More replies", "没有回复": "No replies", "分享": "Shares", "收藏": "Saves", "链接": "Link", "标签": "Tags", "查看被引用的帖子 ↗": "Open the quoted post ↗", "链接：": "Links: ", "下载全部媒体": "Download all media", "作者的帖子": "Author's posts", "TA 的帖子": "Their posts", "原始 JSON": "Raw JSON", "没有数据可导出": "Nothing to export",
+  "够数": "enough", "到底": "end of list", "页数上限": "page limit", "出错": "error", "取消": "Cancel", "查看结果": "View results", "还没有连续拉取任务。在「查询」里把条数切到": "No collect tasks yet. On the Query page switch the count to", "连续到 N 条": "up to N items",
+  "请填写帖子 id": "Enter a post id", "已开始": "started", "这个链接不是帖子": "This link is not a post", "还没有下载任务。在查询结果或详情里点「下载」，或在上面填帖子 id、粘链接。": "No downloads yet. Click Download on a result or in the detail drawer, or enter a post id / paste a link above.",
+  "状态": "Status", "参数 / 错误": "Params / error", "没有任务": "No tasks",
+  "路径": "path", "查询参数": "query", "，必填": ", required", "，默认": ", default", "复制": "Copy", "试一下": "Try it", "没有可用的数据接口。": "No data endpoints available.", "无参数": "No parameters", "资源": "Resources", "已复制": "Copied", "复制失败": "Copy failed", "请求中…": "Requesting…",
+  "B 站": "Bilibili", "小红书": "Xiaohongshu", "抖音": "Douyin", "快手": "Kuaishou", "公众号": "WeChat Official Accounts", "视频号": "WeChat Channels", "知乎": "Zhihu", "今日头条": "Toutiao",
+  "视频": "video", "笔记": "note", "推文": "tweet", "回答 / 文章 / 问题": "answer / article / question", "动态": "post", "内容": "content",
+  "打勾的是有真实样本和测试、在真浏览器里验证过的；\"待验证\"是代码已完成但还没跑通；空的是平台没有。鼠标放在平台图标上看该平台的说明": "A check means recorded samples, tests and a real-browser run; \"unverified\" means the code exists but has not run through yet; a dash means the website has no such thing. Hover a platform icon for its notes",
+  "还没有连续拉取任务。在「查询」里把条数切到\"连续到 N 条\"。": "No collect tasks yet. On the Query page switch the count to \"up to N items\".",
+  "打开 bilibili.com，右上角登录（扫码或账号密码）": "open bilibili.com and sign in at the top right (QR code or password)", "打开 douyin.com，右上角登录，用抖音 App 扫码": "open douyin.com, sign in at the top right by scanning with the Douyin app", "打开 instagram.com 登录（需要能访问 Instagram 的网络）": "sign in at instagram.com (needs a network that can reach Instagram)", "打开 kuaishou.com，右上角登录，用快手 App 扫码": "open kuaishou.com, sign in at the top right by scanning with the Kuaishou app", "打开 linkedin.com 登录": "sign in at linkedin.com", "打开 reddit.com 登录（不登录也能看公开内容，登录后才有个人首页流）": "sign in at reddit.com (public content works signed out; the home feed needs an account)", "打开 tiktok.com 登录（需要能访问 TikTok 的网络；不登录也能看部分公开内容）": "sign in at tiktok.com (needs a network that can reach TikTok; some public content works signed out)", "打开 toutiao.com，点右上角登录（不登录也能看公开内容）": "open toutiao.com and sign in at the top right (public content works signed out)", "打开 channels.weixin.qq.com（视频号网页版），用微信扫码登录": "open channels.weixin.qq.com and sign in by scanning with WeChat", "打开 mp.weixin.qq.com（公众号后台），用微信扫码登录你自己的公众号；公域搜索和文章列表都走这个后台": "open mp.weixin.qq.com (the Official Accounts backstage) and sign in to your own account with WeChat; search and article lists go through this backstage", "打开 x.com 登录（几乎所有页面都要求登录）": "sign in at x.com (nearly every page requires it)", "打开 xiaohongshu.com，用小红书 App 扫码登录": "open xiaohongshu.com and sign in by scanning with the Xiaohongshu app", "打开 youtube.com，用 Google 账号登录（不登录也能看公开内容）": "open youtube.com and sign in with a Google account (public content works signed out)", "打开 zhihu.com，扫码或账号登录（几乎所有内容都要求登录）": "open zhihu.com and sign in by QR code or password (nearly everything requires it)",
+};
+const trWord = (s) => (EN[s.trim()] != null ? s.replace(s.trim(), EN[s.trim()]) : s);
+const EN_RX = [
+  [/^后端 v(.+)$/, "Backend v$1"],
+  [/^后端不可达：([\s\S]*)$/, "Backend unreachable: $1"],
+  [/^(.+?) 队列已暂停，还剩 (\d+) 分钟。多半是风控或验证码，先在浏览器里处理，再点恢复。$/, (_, p, m) => `${trWord(p)} queue paused, ${m} min left. Usually risk control or a captcha: handle it in the browser, then resume.`],
+  [/^已暂停 (\d+)m$/, "Paused $1m"],
+  [/^页面 (\S+)\/(\S+) · (\d+) 分钟$/, "Pages $1/$2 · $3 min"],
+  [/^(\d+) 个标签页$/, "$1 tabs"],
+  [/^最近 (\d+) 个$/, "Last $1"],
+  [/^(\d+) 个进行中$/, "$1 running"],
+  [/^(.*?) · (\d+) 条 (\d+) 页$/, (_, a, n, p) => `${trWord(a)} · ${n} items, ${p} pages`],
+  [/^(\S+) · (\d+) 个文件$/, "$1 · $2 files"],
+  [/^(.*) · 续页$/, "$1 · next page"],
+  [/^(\d+)\/(\d+) 个文件 · (.+)$/, "$1/$2 files · $3"],
+  [/^([\d.]+) 秒 · 任务 (\w+)$/, "$1 s · task $2"],
+  [/^(\d+) 条(?:，共约 ([^，]+))?(，可翻页|，没有更多)?$/, (_, n, t, more) => `${n} items${t ? ` of ~${t}` : ""}${more === "，可翻页" ? ", more pages" : more === "，没有更多" ? ", no more" : ""}`],
+  [/^连续拉取中：(\d+) 条，(\d+) 页，([\d.]+) 秒$/, "Collecting: $1 items, $2 pages, $3 s"],
+  [/^(\d+) 条 \/ (\d+) 页 · ([\d.]+) 秒$/, "$1 items / $2 pages · $3 s"],
+  [/^(\d+) 条 \/ (\d+) 页$/, "$1 items / $2 pages"],
+  [/^(\d+) 条，站点总数约 (\S+)$/, "$1 items, site total ~$2"],
+  [/^连续拉取 (\w+)$/, "collect $1"],
+  [/^· 查询于 (.+)$/, "· queried at $1"],
+  [/^已展开 (\d+) 条$/, "$1 replies shown"],
+  [/^媒体 (\d+) 个$/, "$1 media"],
+  [/^(\S+) \/ (\S+) 条 · (\d+) 页(?: · (.+))?$/, (_, a, b, p, r) => `${a} / ${b} items · ${p} pages${r ? ` · ${trWord(r)}` : ""}`],
+  [/^下载任务 (\w+) 已开始$/, "Download task $1 started"],
+  [/^待验证：([\s\S]+)$/, (_, r) => `Unverified: ${trWord(r)}`],
+  [/^可用：(.+?)。路径里的 (.+?) 已替换成 (.+?)，示例 id 取自该平台的缓存，能直接复制运行。$/, (_, l, a, b) => `Available: ${l.split("、").map(trWord).join(", ")}. In paths ${a} is replaced with ${b}; example ids come from this platform's cache, so the commands run as they are.`],
+  [/^无法读取平台列表：([\s\S]*)$/, "Cannot load platforms: $1"],
+  [/^(路径|查询)(，必填)? · (.*)$/, (_, w, req, t) => `${w === "路径" ? "path" : "query"}${req ? ", required" : ""} · ${t}`],
+  [/^body(，必填)? · (.*?)(?:，默认 (.*))?$/, (_, req, t, d) => `body${req ? ", required" : ""} · ${t}${d ? `, default ${d}` : ""}`],
+  [/# Claude Code 一条命令接入/, "# Claude Code: one command"],
+  [/# 手动启动（需要后端已在跑，SOCIALLENS_URL 可改后端地址）/, "# Manual start (the backend must be running; SOCIALLENS_URL overrides its address)"],
+  [/^(\d+) 页$/, "$1 pages"],
+  [/^(\d+) 个文件$/, "$1 files"],
+  [/^(\d+) 个$/, "$1"],
+  [/^(\w+)，必填$/, "$1, required"],
+  [/^(\w+)，默认 (.+)$/, "$1, default $2"],
+  [/^(not_logged_in: )?未登录(.+?)：(.+)$/, (_, pre, plat, hint) => `${pre || ""}Not signed in to ${trWord(plat)}: ${trWord(hint)}`],
+];
+const HAS_ZH = /[一-鿿]/;
+function trText(text) {
+  if (!HAS_ZH.test(text)) return null;
+  const k = text.trim();
+  if (EN[k] != null) return text.replace(k, EN[k]);
+  for (const [re, rep] of EN_RX) if (re.test(k)) { const out = k.replace(re, rep); if (out !== k) return text.replace(k, out); }
+  if (k.includes("·")) {
+    const out = k.split(/\s*·\s*/).map((piece) => { const r = piece ? trText(piece) : null; return r == null ? piece : r; }).join(" · ");
+    if (out !== k) return text.replace(k, out);
+  }
+  const lead = /^(\S+) (.+)$/.exec(k); // "搜索内容 露营": a known word followed by data
+  if (lead && EN[lead[1]] != null) return text.replace(k, `${EN[lead[1]]} ${lead[2]}`);
+  return null;
+}
+function translateDom(root) {
+  if (ZH || !root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const texts = [];
+  for (let n = walker.currentNode; n; n = walker.nextNode()) {
+    if (n.nodeType === Node.TEXT_NODE) { if (n.parentElement && !["SCRIPT", "STYLE"].includes(n.parentElement.tagName)) texts.push(n); }
+    else for (const a of ["placeholder", "title"]) { const v = n.getAttribute?.(a); if (v && HAS_ZH.test(v)) { const r = trText(v); if (r != null && r !== v) n.setAttribute(a, r); } }
+  }
+  for (const n of texts) { const r = trText(n.nodeValue); if (r != null && r !== n.nodeValue) n.nodeValue = r; }
+}
+if (!ZH) {
+  document.documentElement.lang = "en";
+  const mo = new MutationObserver((muts) => { for (const m of muts) { if (m.type === "characterData") { const r = trText(m.target.nodeValue); if (r != null && r !== m.target.nodeValue) m.target.nodeValue = r; } else if (m.type === "attributes") translateDom(m.target); else m.addedNodes.forEach((n) => translateDom(n.nodeType === Node.TEXT_NODE ? n.parentElement : n)); } });
+  document.addEventListener("DOMContentLoaded", () => { translateDom(document.body); document.title = EN[document.title] || document.title; mo.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["placeholder", "title"] }); });
+}
+
 const LOGOS = {
   bilibili: { bg: "#00A1D6", mark: "B" }, xiaohongshu: { bg: "#FF2442", mark: "红" }, douyin: { bg: "#161823", mark: "抖" }, kuaishou: { bg: "#FF4906", mark: "快" },
   weixin_mp: { bg: "#07C160", mark: "公" }, weixin_channels: { bg: "#FA9D3B", mark: "视" }, youtube: { bg: "#FF0000", mark: "▶" }, x: { bg: "#000000", mark: "X" },
@@ -357,7 +465,7 @@ const state = { platforms: [], status: null, page: "overview", platform: null, m
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const fmtN = (n) => n == null ? "–" : n >= 1e8 ? (n / 1e8).toFixed(1) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n);
+const fmtN = (n) => n == null ? "–" : ZH ? (n >= 1e8 ? (n / 1e8).toFixed(1) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n)) : (n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n));
 const fmtT = (t) => t ? String(t).replace("T", " ").slice(5, 16) : "–";
 const fmtB = (b) => b == null ? "–" : b >= 1 << 30 ? (b / (1 << 30)).toFixed(2) + " GB" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : b >= 1024 ? (b / 1024).toFixed(0) + " KB" : b + " B";
 let msgTimer;
@@ -774,63 +882,64 @@ async function loadCache() {
 // supports (its capabilities), with Chinese names / descriptions kept here. The matrix is the
 // honest overview: capability present = verified in a real browser, except the UNVERIFIED ones.
 let apiDoc = null, mcpDoc = null;
-const CAP_COLS = [["search_posts", "搜索内容"], ["search_users", "搜索用户"], ["get_post", "帖子详情"], ["get_comments", "评论"], ["get_replies", "评论回复"], ["get_user", "用户资料"], ["get_user_posts", "用户帖子"], ["get_feed", "推荐流"], ["get_trending", "热榜"], ["download", "下载"]];
-const UNVERIFIED = { weixin_mp: { get_user_posts: "账号被 freq control 冻结，等解冻录样本" } };
+const CAP_COLS = [["search_posts", Z("搜索内容", "Search posts")], ["search_users", Z("搜索用户", "Search users")], ["get_post", Z("帖子详情", "Post detail")], ["get_comments", Z("评论", "Comments")], ["get_replies", Z("评论回复", "Replies")], ["get_user", Z("用户资料", "Profile")], ["get_user_posts", Z("用户帖子", "User posts")], ["get_feed", Z("推荐流", "Feed")], ["get_trending", Z("热榜", "Trending")], ["download", Z("下载", "Download")]];
+const UNVERIFIED = { weixin_mp: { get_user_posts: Z("账号被 freq control 冻结，等解冻录样本", "the account is frozen by freq control; samples wait for the thaw") } };
 const NO_DOWNLOAD = new Set(["weixin_channels"]);
 const PLATFORM_NOTES = {
-  weixin_channels: "视频号网页版只有创作者后台和分享链接播放页，没有公域搜索、详情、评论入口，这些接口都不可用；后台数据接口留到以后做。",
-  weixin_mp: "公众号没有推荐流和热榜；搜索只能搜公众号（账号），文章列表靠 appmsg 接口，账号解冻后才能验证。",
-  xiaohongshu: "小红书的笔记和用户 id 要配合链接里的 xsec_token；热榜实际是搜索框的\"猜你想搜\"，个性化。",
-  kuaishou: "快手网页版的评论列表不带子评论信息，没有评论回复；也没找到公开热榜。",
-  youtube: "YouTube 不登录也能用公开内容；下载走 yt-dlp 并沿用系统代理。",
-  linkedin: "LinkedIn 新版首页和搜索是服务端驱动 UI，没有可捕获的实体数据，首页流、帖子详情、个人资料、人员搜索在标签页里调用老的 voyager 接口（带 csrf 头）；作者动态页和帖子详情页还是老版页面，作者动态、评论、评论回复靠捕获它自己的请求。没有内容搜索和热榜。作者动态对非联系人只给 20 条；人员搜索的 queryId 会随站点部署变化。",
-  instagram: "Instagram 只捕获站点自己发的 GraphQL 请求，扩展不主动调接口。帖子详情和评论第一页是页面内嵌数据；用户搜索通过在搜索框里输入触发，没有翻页（网页版本身不提供更多账号结果）。风控最严的平台，整页加载配额 10 分钟 10 次。",
-  toutiao: "头条所有接口都带站点自己算的签名，扩展只打开页面、捕获站点自己发的请求。搜索走 so.toutiao.com 的资讯标签；评论第二页起要打开评论抽屉，抽屉在未登录时可能不可用。",
-  reddit: "Reddit 走公开的 .json 接口，不需要签名；不登录也能用，登录后首页流才是个性化的。评论一次最多 100 条顶层，更多的要 morechildren 接口，暂不做。",
-  zhihu: "知乎几乎所有内容都要登录。帖子 id 形如 answer:123、article:123、question:123；评论会内联带上每条的前几条回复。",
-  tiktok: "TikTok 需要能访问的网络（浏览器走系统代理即可）。视频只给 id 时，后端先通过公开的 oembed 接口换成作者名再打开页面。评论要先在页面里点开评论面板才会请求，扩展会自动点。",
+  weixin_channels: Z("视频号网页版只有创作者后台和分享链接播放页，没有公域搜索、详情、评论入口，这些接口都不可用；后台数据接口留到以后做。", "The WeChat Channels website only has the creator backstage and share-link players: no public search, detail or comment entry, so none of these endpoints work. Backstage data endpoints are left for later."),
+  weixin_mp: Z("公众号没有推荐流和热榜；搜索只能搜公众号（账号），文章列表靠 appmsg 接口，账号解冻后才能验证。", "Official Accounts have no feed or trending; search only finds accounts, and the article list relies on the appmsg endpoint, which can only be verified once the account thaws."),
+  xiaohongshu: Z("小红书的笔记和用户 id 要配合链接里的 xsec_token；热榜实际是搜索框的\"猜你想搜\"，个性化。", "Xiaohongshu note and user ids need the xsec_token from the link; \"trending\" is really the search box's personalised suggestions."),
+  kuaishou: Z("快手网页版的评论列表不带子评论信息，没有评论回复；也没找到公开热榜。", "Kuaishou's web comment list carries no reply information, so there are no replies; no public trending list was found either."),
+  youtube: Z("YouTube 不登录也能用公开内容；下载走 yt-dlp 并沿用系统代理。", "YouTube works without signing in for public content; downloads go through yt-dlp using the system proxy."),
+  linkedin: Z("LinkedIn 新版首页和搜索是服务端驱动 UI，没有可捕获的实体数据，首页流、帖子详情、个人资料、人员搜索在标签页里调用老的 voyager 接口（带 csrf 头）；作者动态页和帖子详情页还是老版页面，作者动态、评论、评论回复靠捕获它自己的请求。没有内容搜索和热榜。作者动态对非联系人只给 20 条；人员搜索的 queryId 会随站点部署变化。", "LinkedIn's new home and search are server-driven UI with no capturable entity data, so feed, post detail, profile and people search call the classic voyager API inside the tab (with the csrf header); the activity and post-detail pages are still the classic app, so member posts, comments and replies are captured from its own requests. No content search or trending. Member posts stop at 20 for non-connections; the people-search queryId changes with deployments."),
+  instagram: Z("Instagram 只捕获站点自己发的 GraphQL 请求，扩展不主动调接口。帖子详情和评论第一页是页面内嵌数据；用户搜索通过在搜索框里输入触发，没有翻页（网页版本身不提供更多账号结果）。风控最严的平台，整页加载配额 10 分钟 10 次。", "Instagram only captures the site's own GraphQL requests; the extension never calls the API itself. Post detail and the first comment page are embedded in the page; user search is triggered by typing into the search box and has no paging (the website offers no more). The strictest platform: 10 page loads per 10 minutes."),
+  toutiao: Z("头条所有接口都带站点自己算的签名，扩展只打开页面、捕获站点自己发的请求。搜索走 so.toutiao.com 的资讯标签；评论第二页起要打开评论抽屉，抽屉在未登录时可能不可用。", "Every Toutiao endpoint carries a site-computed signature, so the extension only opens pages and captures the site's own requests. Search uses the news tab on so.toutiao.com; comment pages after the first need the comment drawer, which may require signing in."),
+  reddit: Z("Reddit 走公开的 .json 接口，不需要签名；不登录也能用，登录后首页流才是个性化的。评论一次最多 100 条顶层，更多的要 morechildren 接口，暂不做。", "Reddit uses the public .json endpoints, no signature needed; works signed out, the home feed is personalised only when signed in. Comments come 100 top-level at a time; the rest go through morechildren."),
+  zhihu: Z("知乎几乎所有内容都要登录。帖子 id 形如 answer:123、article:123、question:123；评论会内联带上每条的前几条回复。", "Nearly everything on Zhihu requires signing in. Post ids look like answer:123, article:123, question:123; comments inline the first few replies of each."),
+  tiktok: Z("TikTok 需要能访问的网络（浏览器走系统代理即可）。视频只给 id 时，后端先通过公开的 oembed 接口换成作者名再打开页面。评论要先在页面里点开评论面板才会请求，扩展会自动点。", "TikTok needs a network that can reach it (the browser's system proxy is enough). Given only a video id, the backend first resolves the author through the public oembed endpoint. Comments load only after the comment panel is opened; the extension clicks it."),
 };
-const NOUN = { bilibili: "视频", xiaohongshu: "笔记", douyin: "视频", kuaishou: "视频", weixin_mp: "文章", youtube: "视频", x: "推文", weixin_channels: "视频", reddit: "帖子", zhihu: "回答 / 文章 / 问题", tiktok: "视频", toutiao: "文章", instagram: "帖子", linkedin: "动态" };
-const USER_ID = { reddit: "用户名（不带 u/）", zhihu: "url_token（主页链接 /people/ 后面那段）", tiktok: "@uniqueId（不带 @ 也行）", bilibili: "mid（数字）", xiaohongshu: "用户 id，配合链接里的 xsec_token", douyin: "sec_uid（主页链接 /user/ 后面那串）", kuaishou: "用户 id（主页链接 /profile/ 后面那段）", weixin_mp: "公众号的 fakeid（搜索公众号结果里的 id）", youtube: "@handle 或 UC 开头的频道 id", x: "用户名（不带 @）", toutiao: "作者主页 token（/c/user/token/ 后面那串 MS4w… ）", instagram: "用户名（不带 @）", linkedin: "个人主页 vanity（/in/ 后面那段）" };
-const ORDERS_DESC = { bilibili: "order 可选 totalrank 综合、click 播放、pubdate 最新", x: "order 可选 live 最新、top 热门", reddit: "order 可选 relevance 相关、hot、top、new、comments" };
-const DL_DESC = { reddit: "i.redd.it 图片直链；v.redd.it 视频是分离的 DASH，取视频和音轨用 ffmpeg 合并，无声视频只留视频。", tiktok: "视频地址绑定浏览器 cookie，后端直连 403，交给 yt-dlp 并沿用系统代理。", bilibili: "有 ffmpeg 时取 DASH 最高画质并合并音视频，没有时取单文件 mp4；mode 可强制 dash 或 mp4。", youtube: "交给 yt-dlp（已装进后端环境），最高画质并合并，沿用系统代理。", weixin_mp: "下载文章里的图片（直链）。", xiaohongshu: "视频取最高清晰度的直链，图片取原图；要带 xsec_token。", douyin: "视频直链，无水印版本以站点给的为准；图文帖下载全部图片。", kuaishou: "视频直链。", x: "视频取最高码率的 mp4，图片取原图。" };
+const NOUN = { bilibili: Z("视频", "videos"), xiaohongshu: Z("笔记", "notes"), douyin: Z("视频", "videos"), kuaishou: Z("视频", "videos"), weixin_mp: Z("文章", "articles"), youtube: Z("视频", "videos"), x: Z("推文", "tweets"), weixin_channels: Z("视频", "videos"), reddit: Z("帖子", "posts"), zhihu: Z("回答 / 文章 / 问题", "answers / articles / questions"), tiktok: Z("视频", "videos"), toutiao: Z("文章", "articles"), instagram: Z("帖子", "posts"), linkedin: Z("动态", "posts") };
+const USER_ID = { reddit: Z("用户名（不带 u/）", "username (without u/)"), zhihu: Z("url_token（主页链接 /people/ 后面那段）", "url_token (the part after /people/ in the profile link)"), tiktok: Z("@uniqueId（不带 @ 也行）", "@uniqueId (the @ is optional)"), bilibili: Z("mid（数字）", "mid (a number)"), xiaohongshu: Z("用户 id，配合链接里的 xsec_token", "user id plus the xsec_token from the link"), douyin: Z("sec_uid（主页链接 /user/ 后面那串）", "sec_uid (the part after /user/ in the profile link)"), kuaishou: Z("用户 id（主页链接 /profile/ 后面那段）", "user id (the part after /profile/)"), weixin_mp: Z("公众号的 fakeid（搜索公众号结果里的 id）", "the account's fakeid (the id in account search results)"), youtube: Z("@handle 或 UC 开头的频道 id", "@handle or a UC… channel id"), x: Z("用户名（不带 @）", "username (without @)"), toutiao: Z("作者主页 token（/c/user/token/ 后面那串 MS4w… ）", "profile token (the MS4w… part after /c/user/token/)"), instagram: Z("用户名（不带 @）", "username (without @)"), linkedin: Z("个人主页 vanity（/in/ 后面那段）", "profile vanity name (the part after /in/)") };
+const ORDERS_DESC = { bilibili: Z("order 可选 totalrank 综合、click 播放、pubdate 最新", "order: totalrank (relevance), click (views), pubdate (newest)"), x: Z("order 可选 live 最新、top 热门", "order: live (latest), top"), reddit: Z("order 可选 relevance 相关、hot、top、new、comments", "order: relevance, hot, top, new, comments") };
+const DL_DESC = { reddit: Z("i.redd.it 图片直链；v.redd.it 视频是分离的 DASH，取视频和音轨用 ffmpeg 合并，无声视频只留视频。", "i.redd.it images are direct; v.redd.it videos are split DASH, video and audio are merged with ffmpeg, silent videos keep the video track only."), tiktok: Z("视频地址绑定浏览器 cookie，后端直连 403，交给 yt-dlp 并沿用系统代理。", "Video urls are bound to browser cookies and answer 403 from the backend, so yt-dlp handles them through the system proxy."), bilibili: Z("有 ffmpeg 时取 DASH 最高画质并合并音视频，没有时取单文件 mp4；mode 可强制 dash 或 mp4。", "With ffmpeg the best DASH quality is merged; without it a single mp4 is taken; mode forces dash or mp4."), youtube: Z("交给 yt-dlp（已装进后端环境），最高画质并合并，沿用系统代理。", "Handled by yt-dlp (installed with the backend), best quality merged, through the system proxy."), weixin_mp: Z("下载文章里的图片（直链）。", "Downloads the article's images (direct links)."), xiaohongshu: Z("视频取最高清晰度的直链，图片取原图；要带 xsec_token。", "Best-quality video link and original images; needs xsec_token."), douyin: Z("视频直链，无水印版本以站点给的为准；图文帖下载全部图片。", "Direct video link as the site provides it; image posts download every image."), kuaishou: Z("视频直链。", "Direct video link."), x: Z("视频取最高码率的 mp4，图片取原图。", "Highest-bitrate mp4 for videos, original images.") };
 const ROUTE_INFO = {
-  "GET /api/v1/{platform}/search": { name: "搜索", cap: "search", desc: (pid, caps) => {
-    const kinds = [caps.has("search_posts") ? `搜${NOUN[pid] || "内容"}（type=post）` : null, caps.has("search_users") ? "搜账号（type=user）" : null].filter(Boolean);
-    if (!caps.has("search_posts")) return `只能搜账号（type=user），${pid === "weixin_mp" ? "也就是按名称搜公众号" : "不能搜内容"}。带 cursor 翻页。`;
-    return `${kinds.join("，")}，type 默认 post。${ORDERS_DESC[pid] ? ORDERS_DESC[pid] + "。" : ""}带 cursor 翻页。${pid === "xiaohongshu" ? "搜索接口容易触发风控，别连续大量调用。" : ""}`;
+  "GET /api/v1/{platform}/search": { name: Z("搜索", "Search"), cap: "search", desc: (pid, caps) => {
+    const noun = NOUN[pid] || Z("内容", "content");
+    const kinds = [caps.has("search_posts") ? Z(`搜${noun}（type=post）`, `${noun} (type=post)`) : null, caps.has("search_users") ? Z("搜账号（type=user）", "accounts (type=user)") : null].filter(Boolean);
+    if (!caps.has("search_posts")) return Z(`只能搜账号（type=user），${pid === "weixin_mp" ? "也就是按名称搜公众号" : "不能搜内容"}。带 cursor 翻页。`, `Accounts only (type=user)${pid === "weixin_mp" ? ", i.e. official accounts by name" : "; no content search"}. Pages with cursor.`);
+    return Z(`${kinds.join("，")}，type 默认 post。${ORDERS_DESC[pid] ? ORDERS_DESC[pid] + "。" : ""}带 cursor 翻页。${pid === "xiaohongshu" ? "搜索接口容易触发风控，别连续大量调用。" : ""}`, `Searches ${kinds.join(" or ")}; type defaults to post. ${ORDERS_DESC[pid] ? ORDERS_DESC[pid] + ". " : ""}Pages with cursor.${pid === "xiaohongshu" ? " Search trips risk control easily; avoid bursts." : ""}`);
   } },
-  "GET /api/v1/{platform}/posts/{post_id}": { name: "帖子详情", cap: "get_post", desc: (pid) => `一条${NOUN[pid] || "帖子"}：标题、正文、作者、指标、媒体地址。${pid === "xiaohongshu" ? "post_id 是笔记 id，必须带列表项里的 xsec_token。" : pid === "bilibili" ? "post_id 用 BV 号或 av 号。" : pid === "weixin_mp" ? "post_id 是文章链接 /s/ 后面那段。" : pid === "youtube" ? "post_id 是视频 id（watch?v= 后面 11 位）。" : pid === "x" ? "post_id 是推文 id（status/ 后面的数字）。" : ""}` },
-  "GET /api/v1/{platform}/posts/{post_id}/comments": { name: "评论", cap: "get_comments", desc: (pid) => `一级评论列表，带 cursor 翻页。${pid === "bilibili" ? "mode 选排序：3 热门（默认）、2 时间。" : pid === "xiaohongshu" ? "要带 xsec_token。" : pid === "reddit" ? "mode 选排序：confidence（默认）、top、new、controversial、old、qa；每页最多 100 条顶层，cursor 翻页走 morechildren；回复以\"有更多回复\"标记。" : pid === "zhihu" ? "每条评论内联带前几条回复（parent_id 已挂好）。" : ""}` },
-  "GET /api/v1/{platform}/posts/{post_id}/comments/{comment_id}/replies": { name: "评论的回复", cap: "get_replies", desc: (pid) => `一条评论下的回复（楼中楼），parent_id 是该评论，带 cursor 翻页。${["douyin", "xiaohongshu"].includes(pid) ? "接口带签名，扩展会在页面里找到那条评论点\"展开回复\"再捕获，每次十几秒。" : pid === "youtube" ? "用评论自带的 continuation，很快。" : pid === "x" ? "就是那条回复自己的详情页。" : ""}` },
-  "GET /api/v1/{platform}/users/{user_id}": { name: "用户资料", cap: "get_user", desc: (pid) => `资料和粉丝、关注、作品数。user_id 用 ${USER_ID[pid] || "平台的用户 id"}。` },
-  "GET /api/v1/{platform}/users/{user_id}/posts": { name: "用户的帖子", cap: "get_user_posts", desc: (pid) => `某个账号发布的${NOUN[pid] || "内容"}，最新在前，带 cursor 翻页。${ORDERS_DESC[pid] && pid === "bilibili" ? "order 可选 pubdate 最新、click 播放。" : ""}${pid === "weixin_mp" ? "走公众号后台的 appmsg 接口，每页 5 篇，账号有频率限制。" : ""}` },
-  "GET /api/v1/{platform}/feed": { name: "推荐流", cap: "get_feed", desc: (pid) => `登录账号自己的${pid === "youtube" ? "首页" : "推荐"}信息流，带 cursor 翻页。` },
-  "GET /api/v1/{platform}/trending": { name: "热榜", cap: "get_trending", desc: (pid) => ({ bilibili: "综合热门视频，data.kind=posts，带 cursor 翻页。", youtube: "Trending 页的视频，data.kind=posts，带 cursor 翻页。", douyin: "抖音热搜话题，data.kind=topics，每条有 rank、title、heat（热度值）、url 和\"新 / 热 / 爆\"标签。", x: "趋势话题，data.kind=topics，heat 从\"12.3K posts\"这类描述解析。", xiaohongshu: "网页版没有公开热榜，这里给的是搜索框的\"猜你想搜\"，个性化推荐，data.kind=topics。" }[pid] || "热门列表。") },
-  "POST /api/v1/{platform}/posts/{post_id}/download": { name: "下载媒体", cap: "download", desc: (pid) => `把这条${NOUN[pid] || "帖子"}的媒体下到 data/downloads/${pid}/{作者}/。${DL_DESC[pid] || ""}默认立即返回任务，wait: true 阻塞到完成；media_index 只下某一个媒体。` },
-  "POST /api/v1/{platform}/collect": { name: "连续拉取", cap: "list", desc: (pid, caps) => `后台连续翻页，直到 limit 条、站点没有更多或 max_pages。${pid} 可用的列表动作：${[...LIST_CAPS].filter((c) => caps.has(c) && !UNVERIFIED[pid]?.[c]).map((c) => `${c}（${CAP_COLS.find((x) => x[0] === c)?.[1]}）`).join("、")}。params 是该动作的参数，结果里有 items、pages、complete、stopped_by。` },
-  "POST /api/v1/{platform}/resume": { name: "恢复队列", cap: null, desc: "队列因验证码或限流暂停后，在浏览器里处理完，调这个恢复。" },
-  "GET /api/v1/{platform}/capabilities": { name: "平台能力", cap: null, desc: "这个平台支持的动作、执行方式（call 在已开页面里发接口，navigate 新开页面）和超时。" },
-  "GET /api/v1/tasks": { name: "任务列表", desc: "最近的任务，可按 platform、status、action（collect、download 等）筛选。" },
-  "GET /api/v1/tasks/{task_id}": { name: "任务详情", desc: "任务状态、参数、结果和错误。下载和连续拉取的进度也在 result 里。" },
-  "POST /api/v1/tasks/{task_id}/cancel": { name: "取消任务", desc: "取消排队或执行中的任务，下载和连续拉取都可以。" },
-  "GET /api/v1/downloads": { name: "下载任务列表", desc: "最近的下载任务，每个文件的进度、路径和错误。" },
-  "GET /api/v1/collects": { name: "连续拉取任务列表", desc: "最近的连续拉取任务：条数、页数、结束原因。" },
-  "GET /health": { name: "健康检查", desc: "后端活着就返回 ok 和版本号。" },
-  "GET /api/v1/status": { name: "整体状态", desc: "后端版本、扩展连接、各平台登录状态和标签页、每个队列的排队、暂停、页面加载配额用量。" },
-  "GET /api/v1/platforms": { name: "平台列表", desc: "所有平台：id、名称、登录地址和提示、域名、风险等级、限速、能力。" },
-  "GET /api/v1/resolve": { name: "识别链接", desc: "把粘进来的链接或 id 变成 platform、kind（post / user / keyword / short_link）和 id，小红书链接会带出 xsec_token。控制台顶部的输入框就是它。" },
-  "GET /api/v1/items": { name: "本地缓存", desc: "查询过的帖子、用户、评论（kind）都存在本地 SQLite，按最近更新排序，可按平台筛选。" },
-  "GET /api/v1/items/{kind}/{platform}/{item_id}": { name: "缓存里的一条", desc: "按类型、平台、id 取缓存里的一条记录。" },
-  "GET /api/v1/mcp/tools": { name: "MCP 工具列表", desc: "MCP server 暴露的 tool 和 resource，本页 MCP 部分的数据来源。" },
-  "GET /api/v1/tasks/cookies": { name: "站点 cookie 名", dev: true, desc: "浏览器为某个站点持有的 cookie 名和域（不含值），用来挑登录标记。" },
-  "POST /api/v1/tasks/echo": { name: "扩展回声", dev: true, desc: "经扩展的 background 走一圈，验证后端和扩展的链路。" },
-  "POST /api/v1/{platform}/echo": { name: "页面回声", dev: true, cap: null, desc: "在该平台的一个标签页里执行 echo，验证页面级路由。" },
-  "POST /api/v1/{platform}/record": { name: "录制模式", dev: true, cap: null, desc: "打开后，该平台标签页里的接口响应都会存到 data/raw/，用来采样和排查。" },
-  "GET /api/v1/{platform}/raw": { name: "原始响应", dev: true, cap: null, desc: "录制模式存下的原始响应清单，按日期。" },
-  "POST /api/v1/{platform}/run": { name: "执行任意动作", dev: true, cap: null, desc: "直接跑该平台声明的能力或通用页面动作（fetch、wait_capture、read_global、navigate 等），raw: true 返回原始响应。采样脚本用的就是它。" },
+  "GET /api/v1/{platform}/posts/{post_id}": { name: Z("帖子详情", "Post detail"), cap: "get_post", desc: (pid) => Z(`一条${NOUN[pid] || "帖子"}：标题、正文、作者、指标、媒体地址。${pid === "xiaohongshu" ? "post_id 是笔记 id，必须带列表项里的 xsec_token。" : pid === "bilibili" ? "post_id 用 BV 号或 av 号。" : pid === "weixin_mp" ? "post_id 是文章链接 /s/ 后面那段。" : pid === "youtube" ? "post_id 是视频 id（watch?v= 后面 11 位）。" : pid === "x" ? "post_id 是推文 id（status/ 后面的数字）。" : ""}`, `One of the platform's ${NOUN[pid] || "posts"}: title, text, author, metrics, media urls.${pid === "xiaohongshu" ? " post_id is the note id and needs the xsec_token from the list item." : pid === "bilibili" ? " post_id is a BV or av id." : pid === "weixin_mp" ? " post_id is the part after /s/ in the article link." : pid === "youtube" ? " post_id is the 11-character video id (after watch?v=)." : pid === "x" ? " post_id is the tweet id (the number after status/)." : ""}`) },
+  "GET /api/v1/{platform}/posts/{post_id}/comments": { name: Z("评论", "Comments"), cap: "get_comments", desc: (pid) => Z(`一级评论列表，带 cursor 翻页。${pid === "bilibili" ? "mode 选排序：3 热门（默认）、2 时间。" : pid === "xiaohongshu" ? "要带 xsec_token。" : pid === "reddit" ? "mode 选排序：confidence（默认）、top、new、controversial、old、qa；每页最多 100 条顶层，cursor 翻页走 morechildren；回复以\"有更多回复\"标记。" : pid === "zhihu" ? "每条评论内联带前几条回复（parent_id 已挂好）。" : ""}`, `Top-level comments, pages with cursor.${pid === "bilibili" ? " mode picks the order: 3 hot (default), 2 by time." : pid === "xiaohongshu" ? " Needs xsec_token." : pid === "reddit" ? " mode picks the order: confidence (default), top, new, controversial, old, qa; up to 100 top-level per page, later pages go through morechildren." : pid === "zhihu" ? " Each comment inlines its first replies (parent_id set)." : ""}`) },
+  "GET /api/v1/{platform}/posts/{post_id}/comments/{comment_id}/replies": { name: Z("评论的回复", "Replies"), cap: "get_replies", desc: (pid) => Z(`一条评论下的回复（楼中楼），parent_id 是该评论，带 cursor 翻页。${["douyin", "xiaohongshu"].includes(pid) ? "接口带签名，扩展会在页面里找到那条评论点\"展开回复\"再捕获，每次十几秒。" : pid === "youtube" ? "用评论自带的 continuation，很快。" : pid === "x" ? "就是那条回复自己的详情页。" : ""}`, `Replies under one comment; parent_id is that comment; pages with cursor.${["douyin", "xiaohongshu"].includes(pid) ? " The endpoint is signed, so the extension locates the comment on the page and clicks its expand control before capturing; ten seconds or so each time." : pid === "youtube" ? " Uses the comment's own continuation token; fast." : pid === "x" ? " This is the reply's own detail page." : ""}`) },
+  "GET /api/v1/{platform}/users/{user_id}": { name: Z("用户资料", "Profile"), cap: "get_user", desc: (pid) => Z(`资料和粉丝、关注、作品数。user_id 用 ${USER_ID[pid] || "平台的用户 id"}。`, `Profile with follower, following and post counts. user_id is the ${USER_ID[pid] || "platform's user id"}.`) },
+  "GET /api/v1/{platform}/users/{user_id}/posts": { name: Z("用户的帖子", "User posts"), cap: "get_user_posts", desc: (pid) => Z(`某个账号发布的${NOUN[pid] || "内容"}，最新在前，带 cursor 翻页。${pid === "bilibili" ? "order 可选 pubdate 最新、click 播放。" : ""}${pid === "weixin_mp" ? "走公众号后台的 appmsg 接口，每页 5 篇，账号有频率限制。" : ""}`, `The ${NOUN[pid] || "posts"} an account published, newest first, pages with cursor.${pid === "bilibili" ? " order: pubdate (newest) or click (views)." : ""}${pid === "weixin_mp" ? " Uses the backstage appmsg endpoint, 5 per page, rate limited per account." : ""}`) },
+  "GET /api/v1/{platform}/feed": { name: Z("推荐流", "Feed"), cap: "get_feed", desc: (pid) => Z(`登录账号自己的${pid === "youtube" ? "首页" : "推荐"}信息流，带 cursor 翻页。`, `The signed-in account's ${pid === "youtube" ? "home" : "recommendation"} feed, pages with cursor.`) },
+  "GET /api/v1/{platform}/trending": { name: Z("热榜", "Trending"), cap: "get_trending", desc: (pid) => ({ bilibili: Z("综合热门视频，data.kind=posts，带 cursor 翻页。", "Popular videos, data.kind=posts, pages with cursor."), youtube: Z("Trending 页的视频，data.kind=posts，带 cursor 翻页。", "Videos from the Trending page, data.kind=posts, pages with cursor."), douyin: Z("抖音热搜话题，data.kind=topics，每条有 rank、title、heat（热度值）、url 和\"新 / 热 / 爆\"标签。", "Hot search topics, data.kind=topics, each with rank, title, heat, url and a label."), x: Z("趋势话题，data.kind=topics，heat 从\"12.3K posts\"这类描述解析。", "Trends, data.kind=topics; heat is parsed from descriptions like \"12.3K posts\"."), xiaohongshu: Z("网页版没有公开热榜，这里给的是搜索框的\"猜你想搜\"，个性化推荐，data.kind=topics。", "The website has no public trending list; this is the search box's personalised suggestions, data.kind=topics.") }[pid] || Z("热门列表。", "Trending list.")) },
+  "POST /api/v1/{platform}/posts/{post_id}/download": { name: Z("下载媒体", "Download media"), cap: "download", desc: (pid) => Z(`把这条${NOUN[pid] || "帖子"}的媒体下到 data/downloads/${pid}/{作者}/。${DL_DESC[pid] || ""}默认立即返回任务，wait: true 阻塞到完成；media_index 只下某一个媒体。`, `Downloads the post's media into data/downloads/${pid}/{author}/. ${DL_DESC[pid] ? DL_DESC[pid] + " " : ""}Returns the task at once; wait: true blocks until done; media_index downloads a single item.`) },
+  "POST /api/v1/{platform}/collect": { name: Z("连续拉取", "Collect"), cap: "list", desc: (pid, caps) => { const acts = [...LIST_CAPS].filter((c) => caps.has(c) && !UNVERIFIED[pid]?.[c]).map((c) => `${c}${Z("（", " (")}${CAP_COLS.find((x) => x[0] === c)?.[1]}${Z("）", ")")}`).join(Z("、", ", ")); return Z(`后台连续翻页，直到 limit 条、站点没有更多或 max_pages。${pid} 可用的列表动作：${acts}。params 是该动作的参数，结果里有 items、pages、complete、stopped_by。`, `Pages in the background until limit items, the end of the list or max_pages. List actions for ${pid}: ${acts}. params are that action's parameters; the result carries items, pages, complete and stopped_by.`); } },
+  "POST /api/v1/{platform}/resume": { name: Z("恢复队列", "Resume queue"), cap: null, desc: Z("队列因验证码或限流暂停后，在浏览器里处理完，调这个恢复。", "After a captcha or rate limit paused the queue, handle it in the browser and call this to resume.") },
+  "GET /api/v1/{platform}/capabilities": { name: Z("平台能力", "Capabilities"), cap: null, desc: Z("这个平台支持的动作、执行方式（call 在已开页面里发接口，navigate 新开页面）和超时。", "The platform's actions, how each runs (call = request inside an open tab, navigate = open a page) and timeouts.") },
+  "GET /api/v1/tasks": { name: Z("任务列表", "Task list"), desc: Z("最近的任务，可按 platform、status、action（collect、download 等）筛选。", "Recent tasks; filter by platform, status or action (collect, download …).") },
+  "GET /api/v1/tasks/{task_id}": { name: Z("任务详情", "Task detail"), desc: Z("任务状态、参数、结果和错误。下载和连续拉取的进度也在 result 里。", "Status, params, result and error of a task. Download and collect progress live in result.") },
+  "POST /api/v1/tasks/{task_id}/cancel": { name: Z("取消任务", "Cancel task"), desc: Z("取消排队或执行中的任务，下载和连续拉取都可以。", "Cancels a queued or running task, downloads and collects included.") },
+  "GET /api/v1/downloads": { name: Z("下载任务列表", "Download tasks"), desc: Z("最近的下载任务，每个文件的进度、路径和错误。", "Recent download tasks with per-file progress, path and error.") },
+  "GET /api/v1/collects": { name: Z("连续拉取任务列表", "Collect tasks"), desc: Z("最近的连续拉取任务：条数、页数、结束原因。", "Recent collect tasks: item count, pages, why they stopped.") },
+  "GET /health": { name: Z("健康检查", "Health"), desc: Z("后端活着就返回 ok 和版本号。", "Returns ok and the version while the backend is alive.") },
+  "GET /api/v1/status": { name: Z("整体状态", "Status"), desc: Z("后端版本、扩展连接、各平台登录状态和标签页、每个队列的排队、暂停、页面加载配额用量。", "Backend version, extension connection, per-platform login state and tabs, each queue's backlog, pauses and page-load budget.") },
+  "GET /api/v1/platforms": { name: Z("平台列表", "Platforms"), desc: Z("所有平台：id、名称、登录地址和提示、域名、风险等级、限速、能力。", "Every platform: id, name, login url and hint, domains, risk level, rate limit, capabilities.") },
+  "GET /api/v1/resolve": { name: Z("识别链接", "Resolve link"), desc: Z("把粘进来的链接或 id 变成 platform、kind（post / user / keyword / short_link）和 id，小红书链接会带出 xsec_token。控制台顶部的输入框就是它。", "Turns a pasted link or id into platform, kind (post / user / keyword / short_link) and id; Xiaohongshu links also yield xsec_token. The console's top input uses it.") },
+  "GET /api/v1/items": { name: Z("本地缓存", "Local cache"), desc: Z("查询过的帖子、用户、评论（kind）都存在本地 SQLite，按最近更新排序，可按平台筛选。", "Every queried post, user and comment (kind) is stored in local SQLite; sorted by last update, filterable by platform.") },
+  "GET /api/v1/items/{kind}/{platform}/{item_id}": { name: Z("缓存里的一条", "One cached item"), desc: Z("按类型、平台、id 取缓存里的一条记录。", "One cached record by kind, platform and id.") },
+  "GET /api/v1/mcp/tools": { name: Z("MCP 工具列表", "MCP tools"), desc: Z("MCP server 暴露的 tool 和 resource，本页 MCP 部分的数据来源。", "The tools and resources the MCP server exposes; the source of this page's MCP section.") },
+  "GET /api/v1/tasks/cookies": { name: Z("站点 cookie 名", "Site cookie names"), dev: true, desc: Z("浏览器为某个站点持有的 cookie 名和域（不含值），用来挑登录标记。", "Cookie names and domains the browser holds for a site (no values), for picking a login marker.") },
+  "POST /api/v1/tasks/echo": { name: Z("扩展回声", "Extension echo"), dev: true, desc: Z("经扩展的 background 走一圈，验证后端和扩展的链路。", "Round trip through the extension's background; verifies the backend–extension link.") },
+  "POST /api/v1/{platform}/echo": { name: Z("页面回声", "Page echo"), dev: true, cap: null, desc: Z("在该平台的一个标签页里执行 echo，验证页面级路由。", "Runs echo inside one of the platform's tabs; verifies page-level routing.") },
+  "POST /api/v1/{platform}/record": { name: Z("录制模式", "Recording mode"), dev: true, cap: null, desc: Z("打开后，该平台标签页里的接口响应都会存到 data/raw/，用来采样和排查。", "While on, API responses in the platform's tabs are saved to data/raw/ for sampling and debugging.") },
+  "GET /api/v1/{platform}/raw": { name: Z("原始响应", "Raw responses"), dev: true, cap: null, desc: Z("录制模式存下的原始响应清单，按日期。", "Raw responses saved by recording mode, by date.") },
+  "POST /api/v1/{platform}/run": { name: Z("执行任意动作", "Run any action"), dev: true, cap: null, desc: Z("直接跑该平台声明的能力或通用页面动作（fetch、wait_capture、read_global、navigate 等），raw: true 返回原始响应。采样脚本用的就是它。", "Runs any declared capability or generic page action (fetch, wait_capture, read_global, navigate …); raw: true returns the raw response. The sampling scripts use it.") },
 };
-const MCP_ZH = { status: "整体状态", list_platforms: "平台列表和登录状态，先调它", get_capabilities: "某平台的能力", resume: "恢复暂停的队列", get_task: "查任务", search: "搜索内容或用户", get_post: "帖子详情", get_comments: "评论", get_replies: "评论的回复", get_user: "用户资料", get_user_posts: "用户的帖子", get_feed: "推荐流", get_trending: "热榜", collect: "连续拉取多页", download: "下载媒体", list_downloads: "下载任务列表" };
+const MCP_ZH = ZH ? { status: "整体状态", list_platforms: "平台列表和登录状态，先调它", get_capabilities: "某平台的能力", resume: "恢复暂停的队列", get_task: "查任务", search: "搜索内容或用户", get_post: "帖子详情", get_comments: "评论", get_replies: "评论的回复", get_user: "用户资料", get_user_posts: "用户的帖子", get_feed: "推荐流", get_trending: "热榜", collect: "连续拉取多页", download: "下载媒体", list_downloads: "下载任务列表" } : { status: "Overall status", list_platforms: "Platforms and login state; call first", get_capabilities: "A platform's capabilities", resume: "Resume a paused queue", get_task: "Look up a task", search: "Search posts or users", get_post: "Post detail", get_comments: "Comments", get_replies: "Replies", get_user: "Profile", get_user_posts: "User posts", get_feed: "Feed", get_trending: "Trending", collect: "Collect several pages", download: "Download media", list_downloads: "Download tasks" };
 const LIST_CAPS = new Set(["search_posts", "search_users", "get_comments", "get_replies", "get_user_posts", "get_feed", "get_trending"]);
 
 function apiPlatform() { return $("api-platform").value || state.platforms[0]?.id || "bilibili"; }
@@ -844,7 +953,7 @@ function supports(pid, cap) {
   return caps.has(cap);
 }
 async function apiExamples(platform) {
-  const ex = { platform, post_id: "<post_id>", comment_id: "<comment_id>", user_id: "<user_id>", task_id: "<task_id>", item_id: "<id>", kind: "posts", keyword: "露营", q: "https://www.bilibili.com/video/BV1cXNW6XEeC" };
+  const ex = { platform, post_id: "<post_id>", comment_id: "<comment_id>", user_id: "<user_id>", task_id: "<task_id>", item_id: "<id>", kind: "posts", keyword: Z("露营", "camping"), q: "https://www.bilibili.com/video/BV1cXNW6XEeC" };
   try {
     const posts = (await api(`/items?kind=posts&platform=${platform}&limit=1`)).data;
     if (posts[0]) { ex.post_id = posts[0].id; if (posts[0].author?.id) ex.user_id = posts[0].author.id; if (posts[0].raw?.xsec_token) ex.xsec_token = posts[0].raw.xsec_token; }
@@ -860,7 +969,7 @@ function bodySchema(op) { const sc = op.requestBody?.content?.["application/json
 function exampleBody(bs) {
   const body = {};
   for (const [k, v] of Object.entries(bs.properties || {})) {
-    if (k === "action") body[k] = "search_posts"; else if (k === "params") body[k] = { keyword: "露营" }; else if (k === "limit") body[k] = 100; else if (k === "wait") body[k] = true; else if (k === "payload") body[k] = {}; else if (k === "enabled") body[k] = true; else if (k === "xsec_token") continue;
+    if (k === "action") body[k] = "search_posts"; else if (k === "params") body[k] = { keyword: Z("露营", "camping") }; else if (k === "limit") body[k] = 100; else if (k === "wait") body[k] = true; else if (k === "payload") body[k] = {}; else if (k === "enabled") body[k] = true; else if (k === "xsec_token") continue;
     else if ((bs.required || []).includes(k)) body[k] = v.type === "integer" ? 1 : v.type === "boolean" ? true : `<${k}>`;
   }
   return body;
