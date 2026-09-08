@@ -148,7 +148,21 @@
   .drawer.open { transform: none; }
   .drawer .dh { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
   .drawer .dh h2 { margin: 0; font-size: 15px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .drawer .db { padding: 16px; overflow: auto; display: grid; gap: 14px; align-content: start; }
+  .drawer .db { padding: 16px; overflow-y: auto; overflow-x: hidden; display: grid; gap: 14px; align-content: start; }
+  .drawer .db > * { min-width: 0; max-width: 100%; }
+  .drawer .db img { max-width: 100%; height: auto; }
+  .drawer .txt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; max-height: 320px; overflow-y: auto; }
+  .drawer pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .quote { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; background: var(--surface-2); }
+  .quote .who { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .quote .who img { width: 22px; height: 22px; border-radius: 50%; }
+  .quote .who b { font-weight: 600; } .quote .who .sub { margin-left: auto; }
+  .quote .txt { max-height: 200px; }
+  .quote img.cover { max-height: 220px; }
+  .card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: grid; text-decoration: none; color: inherit; background: var(--surface); }
+  .card img { width: 100%; max-height: 200px; object-fit: cover; display: block; }
+  .card .cb { padding: 8px 12px; display: grid; gap: 2px; }
+  .card .ct { font-weight: 600; font-size: 13px; } .card .cd { font-size: 12px; color: var(--ink-2); } .card .cu { font-size: 11px; color: var(--ink-3); }
   .drawer img.cover { width: 100%; border-radius: 6px; background: var(--surface-2); max-height: 280px; object-fit: cover; }
   .kv { display: grid; grid-template-columns: 90px 1fr; gap: 6px 10px; font-size: 13px; margin: 0; }
   .kv dt { color: var(--ink-3); margin: 0; } .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -447,7 +461,21 @@ function dlRow(t, extra = "") {
   return `<div class="dl"><div style="display:flex;gap:8px;align-items:center">${logo(t.platform, true)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.title || t.params?.post_id)}</span>${statusPill(t)}${extra}</div><div class="meter"><i class="${t.status === "failed" ? "bad" : ""}" style="width:${pct}%"></i></div><div class="sub" style="display:flex;justify-content:space-between;gap:8px"><span>${files.length ? `${done}/${files.length} 个文件 · ${fmtB(bytes)}${total ? " / " + fmtB(total) : ""}` : esc(r.stage || "")}</span>${t.error ? `<span class="err" title="${esc(t.error.message)}">${esc(t.error.message)}</span>` : (files[0]?.path ? `<span class="mono">${esc(files[0].path.split(/[\\/]/).slice(-2).join("/"))}</span>` : "")}</div></div>`;
 }
 
+// Each platform keeps its own result view; switching chips swaps views instead of showing stale rows.
+const views = {};
+function snapView() { return { results: state.results, kind: state.resultKind, cursor: state.cursor, ctx: state.ctx, lastRaw: state.lastRaw, count: $("q-count").textContent, info: $("q-info").innerHTML }; }
+function applyView(v) {
+  state.results = v ? v.results : []; state.resultKind = v ? v.kind : "posts"; state.cursor = v ? v.cursor : null; state.lastRaw = v ? v.lastRaw : null;
+  $("q-count").textContent = v ? v.count : "还没有结果"; $("q-info").innerHTML = v ? v.info : "";
+  if (v && v.results.length) renderItems($("q-results"), v.results, v.kind, v.ctx?.platform || state.platform);
+  else $("q-results").innerHTML = `<div class="empty">选平台和动作，或直接在上面粘一条链接。</div>`;
+  $("q-next").disabled = !state.cursor; setContext(v ? v.ctx : null); closeDrawer();
+}
 function selectPlatform(id) {
+  if (state.platform && state.platform !== id) {
+    if (state.results.length && state.ctx) views[state.platform] = snapView();
+    state.platform = id; applyView(views[id] || null);
+  }
   state.platform = id; updateStale();
   $("q-platforms").querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.id === id));
   const caps = new Set((plat(id)?.capabilities || []).map((c) => c.action));
@@ -561,7 +589,9 @@ function pushHistory() {
 }
 function setContext(ctx) {
   state.ctx = ctx;
-  const label = ctx ? `${logo(ctx.platform, true)} ${esc(pname(ctx.platform))} · ${esc(actionName(ctx.action))}${ctx.key ? ` · <span class="mono">${esc(ctx.key)}</span>` : ""}${ctx.source ? ` <span class="sub">（${esc(ctx.source)}）</span>` : ""}` : "";
+  if (ctx && !ctx.at) ctx.at = Date.now();
+  const when = ctx?.at ? new Date(ctx.at).toLocaleString("zh-CN", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+  const label = ctx ? `${logo(ctx.platform, true)} ${esc(pname(ctx.platform))} · ${esc(actionName(ctx.action))}${ctx.key ? ` · <span class="mono">${esc(ctx.key)}</span>` : ""}${ctx.source ? ` <span class="sub">（${esc(ctx.source)}）</span>` : ""}${when ? ` <span class="sub">· 查询于 ${esc(when)}</span>` : ""}` : "";
   $("q-ctx").innerHTML = label;
   $("q-back").hidden = !state.history.length;
   updateStale();
@@ -643,7 +673,13 @@ function openDrawer(it) {
   if (kind === "users") parts.push(`<div class="metrics">${[["粉丝", m.followers], ["关注", m.following], ["作品", m.posts]].filter((x) => x[1] != null).map(([n, v]) => `<div><b class="num">${fmtN(v)}</b><span>${n}</span></div>`).join("")}</div>`);
   const kv = [["平台", esc(pname(pid))], ["id", `<span class="mono">${esc(it.id)}</span>`], ["作者", it.author ? `${esc(it.author.name)} <span class="sub mono">${esc(it.author.id)}</span>` : null], ["时间", esc(it.publish_time)], ["链接", it.url ? `<a href="${esc(it.url)}" target="_blank">${esc(it.url)}</a>` : null], ["标签", esc((it.tags || []).join("、")) || null], ["简介", esc(it.bio) || null]].filter((x) => x[1]);
   parts.push(`<dl class="kv">${kv.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`);
-  if (it.content) parts.push(`<div style="white-space:pre-wrap;font-size:13px;max-height:220px;overflow:auto">${esc(it.content)}</div>`);
+  if (it.content) parts.push(`<div class="txt">${esc(it.content)}</div>`);
+  const raw = it.raw || {};
+  const cardHtml = (c) => c ? `<a class="card" href="${esc(c.url || "#")}" target="_blank">${c.image ? `<img src="${esc(c.image)}" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<div class="cb">${c.title ? `<span class="ct">${esc(c.title)}</span>` : ""}${c.description || c.preview ? `<span class="cd">${esc(c.description || c.preview)}</span>` : ""}${c.domain || c.url ? `<span class="cu">${esc(c.domain || c.url)}</span>` : ""}</div></a>` : "";
+  if (raw.quoted) { const q = raw.quoted; parts.push(`<div class="quote"><div class="who">${q.avatar_url ? `<img src="${esc(q.avatar_url)}" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<b>${esc(q.author || "")}</b>${q.author_id ? `<span class="sub mono">@${esc(q.author_id)}</span>` : ""}<span class="sub">${fmtT(q.publish_time)}</span></div>${q.text ? `<div class="txt">${esc(q.text)}</div>` : ""}${q.cover_url ? `<img class="cover" src="${esc(q.cover_url)}" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}${cardHtml(q.article || q.card)}${q.url ? `<a href="${esc(q.url)}" target="_blank" class="sub">查看被引用的帖子 ↗</a>` : ""}</div>`); }
+  if (raw.article) parts.push(cardHtml(raw.article));
+  else if (raw.card) parts.push(cardHtml(raw.card));
+  if (Array.isArray(raw.links) && raw.links.length) parts.push(`<div class="sub">链接：${raw.links.map((l) => `<a href="${esc(l.url)}" target="_blank">${esc(l.display || l.url)}</a>`).join("、")}</div>`);
   if (it.media?.length) parts.push(`<div><div class="sub" style="margin-bottom:6px">媒体 ${it.media.length} 个</div>${it.media.map((mm, i) => `<div class="sub" style="display:flex;gap:8px;align-items:center"><span class="pill neutral">${esc(mm.type)}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" class="mono">${esc(mm.url)}</span>${mm.width ? `<span>${mm.width}×${mm.height}</span>` : ""}<button class="btn ghost" onclick="startDownload('${esc(pid)}',${J(it.id)},${J(xs)},${i})">下载</button></div>`).join("")}</div>`);
   const actions = [];
   if (kind === "posts") { actions.push(`<button class="btn" onclick="quick('${esc(pid)}','get_comments',{id:${J(it.id)},xsec:${J(xs)}})">评论</button>`); if (it.media?.length) actions.push(`<button class="btn primary" onclick="startDownload('${esc(pid)}',${J(it.id)},${J(xs)})">下载全部媒体</button>`); if (it.author?.id) actions.push(`<button class="btn" onclick="quick('${esc(pid)}','get_user_posts',{id:${J(it.author.id)},xsec:${J(it.author.raw?.xsec_token || "")}})">作者的帖子</button>`); }

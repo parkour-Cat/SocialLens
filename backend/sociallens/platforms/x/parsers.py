@@ -108,6 +108,64 @@ def _user(u: Any) -> SocialUser | None:
     )
 
 
+def _card(t: dict) -> dict | None:
+    """Link preview card (legacy binding_values, or a unified_card JSON string) -> {title, description, url, image, domain}."""
+    card = t.get("card") or {}
+    vals: dict[str, Any] = {}
+    for b in (card.get("legacy") or {}).get("binding_values") or []:
+        if isinstance(b, dict) and b.get("key") and isinstance(b.get("value"), dict):
+            v = b["value"]
+            vals[b["key"]] = v.get("string_value") or ((v.get("image_value") or {}).get("url"))
+    if not vals:
+        return None
+    out = {"title": vals.get("title"), "description": vals.get("description"), "url": vals.get("card_url") or vals.get("website_url"), "domain": vals.get("domain") or vals.get("vanity_url"), "image": vals.get("photo_image_full_size_large") or vals.get("thumbnail_image_large") or vals.get("summary_photo_image_large")}
+    uc = vals.get("unified_card")
+    if isinstance(uc, str) and uc.startswith("{"):
+        try:
+            import json
+
+            u = json.loads(uc)
+            comps = u.get("component_objects") or {}
+            det = next((c.get("data") for c in comps.values() if isinstance(c, dict) and c.get("type") == "details"), None) or {}
+            out["title"] = out["title"] or ((det.get("title") or {}).get("content"))
+            out["domain"] = out["domain"] or ((det.get("subtitle") or {}).get("content"))
+            dest = next(iter((u.get("destination_objects") or {}).values()), {}) if isinstance(u.get("destination_objects"), dict) else {}
+            out["url"] = out["url"] or ((dest.get("data") or {}).get("url_data") or {}).get("url")
+            media = u.get("media_entities") or {}
+            first = next(iter(media.values()), None) if isinstance(media, dict) else None
+            if isinstance(first, dict) and first.get("media_url_https"):
+                out["image"] = out["image"] or first["media_url_https"]
+        except ValueError:
+            pass
+    return out if any(out.values()) else None
+
+
+def _article(t: dict) -> dict | None:
+    """X Articles (long-form): article.article_results.result {title, preview_text, cover_media}."""
+    r = ((t.get("article") or {}).get("article_results") or {}).get("result") or {}
+    if not r.get("title"):
+        return None
+    cover = ((r.get("cover_media") or {}).get("media_info") or {}).get("original_img_url")
+    return {"id": r.get("rest_id"), "title": r.get("title"), "preview": r.get("preview_text"), "image": cover}
+
+
+def _quoted(t: dict) -> dict | None:
+    """The tweet this one quotes, trimmed to what a card needs."""
+    res = (t.get("quoted_status_result") or {}).get("result") or {}
+    if res.get("__typename") == "TweetWithVisibilityResults":
+        res = res.get("tweet") or {}
+    if not res.get("rest_id"):
+        return None
+    q = _tweet(res)
+    if not q:
+        return None
+    return {"id": q.id, "author": q.author.name if q.author else None, "author_id": q.author.id if q.author else None, "avatar_url": q.author.avatar_url if q.author else None, "text": q.content, "url": q.url, "cover_url": q.cover_url, "publish_time": q.publish_time, "card": (q.raw or {}).get("card"), "article": (q.raw or {}).get("article")}
+
+
+def _links(legacy: dict) -> list[dict]:
+    return [{"url": u.get("expanded_url"), "display": u.get("display_url")} for u in (legacy.get("entities") or {}).get("urls") or [] if isinstance(u, dict) and u.get("expanded_url")]
+
+
 def _tweet(t: dict) -> SocialPost | None:
     legacy = t.get("legacy") or {}
     tid = t.get("rest_id") or legacy.get("id_str")
@@ -157,6 +215,10 @@ def _tweet(t: dict) -> SocialPost | None:
             "quotes": _int(legacy.get("quote_count")),
             "is_quote": legacy.get("is_quote_status"),
             "source": t.get("source"),
+            "quoted": _quoted(t),
+            "card": _card(t),
+            "article": _article(t),
+            "links": _links(legacy),
         },
     )
 

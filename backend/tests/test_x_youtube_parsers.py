@@ -109,3 +109,12 @@ def test_yt_comments():
     assert c["id"] and c["author"]["name"] and c["content"] and c["likes"] is not None
     p2 = yp.parse_get_comments(load("youtube", "get_comments_page2"))
     assert len(p2["items"]) >= 10 and not ({i["id"] for i in p2["items"]} & {i["id"] for i in out["items"]})
+
+
+def test_x_quoted_tweets_and_links_in_raw():
+    out = xp.parse_get_feed(load("x", "get_feed"))
+    quoted = [i for i in out["items"] if i["raw"].get("quoted")]
+    assert quoted, "the feed fixture holds quote tweets"
+    q = quoted[0]["raw"]["quoted"]
+    assert q["id"].isdigit() and q["author"] and q["text"] and q["url"].startswith("https://x.com/")
+    assert any(i["raw"].get("links") for i in out["items"])
