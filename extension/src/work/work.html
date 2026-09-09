@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>SocialLens</title>
+    <style>
+      :root { color-scheme: light dark; --ink: #1f2933; --ink-2: #52606d; --line: #d9e2ec; --bg: #f5f7fa; --surface: #fff; --accent: #0f766e; }
+      @media (prefers-color-scheme: dark) { :root { --ink: #e5e7eb; --ink-2: #9ca3af; --line: #2b3440; --bg: #0f1419; --surface: #161c24; --accent: #5eead4; } }
+      body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.7 system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; display: grid; place-items: center; min-height: 100vh; }
+      main { max-width: 520px; padding: 28px 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+      h1 { font-size: 16px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+      h1 span { width: 22px; height: 22px; border-radius: 6px; background: var(--accent); display: inline-block; }
+      p { margin: 0 0 10px; color: var(--ink-2); }
+      p b { color: var(--ink); font-weight: 600; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="zh">
+        <h1><span></span>SocialLens 工作窗口</h1>
+        <p>扩展会在这个窗口里打开平台页面来取数，用完的页面几分钟后自动关闭，这个说明页会一直留着，好让窗口不必每次重新弹出。</p>
+        <p><b>可以</b>把它缩小、挪到屏幕一角或另一块屏幕，位置会记住。</p>
+        <p><b>不要</b>最小化或让别的窗口把它整个盖住：有些平台靠页面滚动加载下一页，看不见的页面不会加载。任务需要时会把最小化的窗口还原，但不会抢走焦点。</p>
+        <p>关掉这个窗口也没关系，下次需要时会重新打开。</p>
+      </div>
+      <div id="en" hidden>
+        <h1><span></span>SocialLens work window</h1>
+        <p>The extension opens platform pages here to fetch data. Finished pages close after a few minutes; this note stays so the window does not have to pop up again for every task.</p>
+        <p><b>Do</b> shrink it, move it to a corner or to another screen; its position is remembered.</p>
+        <p><b>Don't</b> minimize it or let another window cover it completely: some platforms load the next page only while the page is visible. A task restores a minimized window without taking focus.</p>
+        <p>Closing it is fine; it reopens the next time it is needed.</p>
+      </div>
+    </main>
+    <script>
+      (function () {
+        var lang = "zh";
+        try { var v = localStorage.getItem("sl_lang"); if (v === "zh" || v === "en") lang = v; else lang = /^zh/i.test((chrome.i18n && chrome.i18n.getUILanguage && chrome.i18n.getUILanguage()) || navigator.language || "") ? "zh" : "en"; } catch (e) {}
+        if (lang === "en") { document.documentElement.lang = "en"; document.getElementById("zh").hidden = true; document.getElementById("en").hidden = false; }
+      })();
+    </script>
+  </body>
+</html>

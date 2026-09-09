@@ -20,6 +20,7 @@ const copyStatic = () => {
   cpSync("manifest.json", `${outdir}/manifest.json`);
   cpSync("src/popup/popup.html", `${outdir}/popup.html`);
   cpSync("src/popup/popup.css", `${outdir}/popup.css`);
+  cpSync("src/work/work.html", `${outdir}/work.html`);
 };
 
 const options = {
