@@ -106,7 +106,11 @@
   .chip.off { opacity: .55; }
   .field, select.field { padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; width: 100%; }
   .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; }
-  .seg button { padding: 5px; text-align: center; font-size: 12px; color: var(--ink-2); background: none; border: 0; cursor: pointer; }
+  .seg button { padding: 5px 6px; text-align: center; font-size: 12px; color: var(--ink-2); background: none; border: 0; cursor: pointer; white-space: nowrap; }
+  .seg.count { grid-auto-columns: minmax(84px, auto) 1fr; }
+  .seg.count button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; }
+  .seg.count input { width: 44px; min-width: 0; padding: 0; border: 0; border-bottom: 1px solid var(--line-strong); background: none; color: inherit; font: inherit; text-align: center; -moz-appearance: textfield; }
+  .seg.count input::-webkit-outer-spin-button, .seg.count input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .seg button:disabled { opacity: .4; cursor: default; }
   .results { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; min-width: 0; }
@@ -262,7 +266,7 @@
           <label id="l-cid" hidden>评论 id<input id="q-cid" class="field"></label>
           <label id="l-xsec" hidden>xsec_token<input id="q-xsec" class="field" placeholder="小红书链接里的 xsec_token"></label>
           <label id="l-order" hidden>排序<div class="seg" id="q-order"></div></label>
-          <label>条数<div class="seg"><button class="on" data-mode="page">一页</button><button data-mode="collect">连续到 <input id="q-limit" type="number" value="200" min="1" max="1000" style="width:56px;border:0;background:none;color:inherit;font:inherit;text-align:center"> 条</button></div></label>
+          <label>条数<div class="seg count"><button class="on" data-mode="page">一页</button><button data-mode="collect"><span>连续到</span><input id="q-limit" type="number" value="200" min="1" max="1000"><span>条</span></button></div></label>
           <div style="display:flex;gap:8px"><button class="btn primary" id="q-run" style="flex:1">查询</button><button class="btn" id="q-next" disabled>下一页</button></div>
           <span class="sub" id="q-info"></span>
         </div>
