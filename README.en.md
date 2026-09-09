@@ -1,24 +1,26 @@
+<div align="center">
+
+<img src="docs/assets/logos/bilibili.png" width="28" alt=""> <img src="docs/assets/logos/xiaohongshu.png" width="28" alt=""> <img src="docs/assets/logos/douyin.png" width="28" alt=""> <img src="docs/assets/logos/kuaishou.png" width="28" alt=""> <img src="docs/assets/logos/weixin_mp.png" width="28" alt=""> <img src="docs/assets/logos/youtube.png" width="28" alt=""> <img src="docs/assets/logos/x.png" width="28" alt=""> <img src="docs/assets/logos/reddit.png" width="28" alt=""> <img src="docs/assets/logos/zhihu.png" width="28" alt=""> <img src="docs/assets/logos/tiktok.png" width="28" alt=""> <img src="docs/assets/logos/instagram.png" width="28" alt=""> <img src="docs/assets/logos/linkedin.png" width="28" alt=""> <img src="docs/assets/logos/toutiao.png" width="28" alt="">
+
 # SocialLens
+
+**Turn the social media accounts you are already signed in to in your browser into a local API.**
 
 [中文](README.md) | English
 
-Turn the social media accounts you are already signed in to in your browser into a local API.
+![platforms](https://img.shields.io/badge/platforms-14-0f766e) ![python](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white) ![fastapi](https://img.shields.io/badge/FastAPI-REST-009688?logo=fastapi&logoColor=white) ![chrome](https://img.shields.io/badge/Chrome-MV3%20extension-4285f4?logo=googlechrome&logoColor=white) ![mcp](https://img.shields.io/badge/MCP-server-8a5cf6) ![local](https://img.shields.io/badge/binds-127.0.0.1%20only-555)
+
+</div>
 
 A Chrome extension intercepts and executes each site's own requests inside your signed-in tabs and hands the data to a local FastAPI backend. The backend serves a unified REST API, an MCP server and a web console on `127.0.0.1:17800`. No platform API keys, and the backend never touches your credentials.
 
-Fourteen platforms: Bilibili, Xiaohongshu, Douyin, Kuaishou, WeChat Official Accounts, WeChat Channels (skeleton only), YouTube, X, Reddit, Zhihu, TikTok, Instagram, LinkedIn, Toutiao.
+![Console: query page with the detail drawer](docs/assets/console-query.en.png)
 
 > For personal use only: your own accounts, the content you can already see. The project does no captcha solving, no risk-control evasion and no login automation. When a site shows a captcha, the task fails and the queue pauses until you handle it yourself.
 
 ## How it works
 
-```
-your Chrome ──extension──► ws://127.0.0.1:17800 ◄──REST / MCP / console── local programs
-   │
-   └─ inside a signed-in tab: capture the requests the site makes itself
-      (MAIN-world fetch / XHR hooks), or run the site's own API calls in the
-      page context, and hand the raw responses to the backend
-```
+![Architecture](docs/assets/architecture.en.png)
 
 - **The extension stays thin.** It only intercepts and executes. Parsing, normalisation, storage and the public API all live in the backend.
 - **Two strategies.** `call` runs the site's API inside the tab (Bilibili, Reddit and other sites whose requests are unsigned or reproducible). `navigate` opens a page and only captures what the site requests by itself (Xiaohongshu, Douyin, Instagram and other sites with non-reproducible signatures); paging scrolls or clicks in the same tab.
@@ -30,20 +32,20 @@ your Chrome ──extension──► ws://127.0.0.1:17800 ◄──REST / MCP / 
 
 | Platform | Search posts | Search users | Post | Comments | Replies | Profile | User posts | Feed | Trending | Download |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| Bilibili | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ |
-| Xiaohongshu | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Douyin | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Kuaishou | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ | ✓ | – | ✓ |
-| WeChat Official Accounts | – | ✓ | ✓ | – | – | ✓ | unverified | – | – | ✓ |
-| WeChat Channels | – | – | – | – | – | – | – | – | – | – |
-| YouTube | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| X | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Reddit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Zhihu | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| TikTok | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Instagram | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| LinkedIn | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | unverified |
-| Toutiao | ✓ | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/bilibili.png" width="16" alt=""> Bilibili | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ |
+| <img src="docs/assets/logos/xiaohongshu.png" width="16" alt=""> Xiaohongshu | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/douyin.png" width="16" alt=""> Douyin | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/kuaishou.png" width="16" alt=""> Kuaishou | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ | ✓ | – | ✓ |
+| <img src="docs/assets/logos/weixin_mp.png" width="16" alt=""> WeChat Official Accounts | – | ✓ | ✓ | – | – | ✓ | unverified | – | – | ✓ |
+| <img src="docs/assets/logos/weixin_channels.png" width="16" alt=""> WeChat Channels | – | – | – | – | – | – | – | – | – | – |
+| <img src="docs/assets/logos/youtube.png" width="16" alt=""> YouTube | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/x.png" width="16" alt=""> X | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/reddit.png" width="16" alt=""> Reddit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/zhihu.png" width="16" alt=""> Zhihu | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/tiktok.png" width="16" alt=""> TikTok | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/instagram.png" width="16" alt=""> Instagram | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/linkedin.png" width="16" alt=""> LinkedIn | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | unverified |
+| <img src="docs/assets/logos/toutiao.png" width="16" alt=""> Toutiao | ✓ | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 A check means a real-browser run with recorded samples and parser tests. A dash means the website has no entry point for it, or the old endpoint is gone. Endpoint mappings, paging mechanics and known pitfalls for every platform are in [docs/platforms/](docs/platforms/).
 
@@ -88,10 +90,14 @@ The backend recognises the extension by the fixed extension id from the `key` fi
 
 Open http://127.0.0.1:17800/ once the backend runs. A single static page, no build step, dark mode follows the system. The language follows the browser and can be switched at the bottom of the sidebar (Chinese / English).
 
+![Console: overview](docs/assets/console-overview.en.png)
+
 - **Overview**: one tile per platform with login state, queue state and the page-load budget; a banner with a one-click resume when risk control paused a queue; recent tasks and download progress.
 - **Query**: pick a platform, an action and parameters, in "one page" or "up to N items" mode. Results switch columns for posts, users, comments and topics; comments render as threads with inline reply loading; a row opens a detail drawer (metrics, media, quoted posts and link cards, raw JSON). Paging, JSON / CSV export. Results are kept per platform, and the top input resolves pasted links, ids or keywords.
 - **Collect, Downloads, Tasks, Cache**: task lists with progress and cancel; everything queried is stored in local SQLite and can be browsed and exported by platform.
 - **API**: the capability matrix (hover a platform icon for its notes), the REST list generated from OpenAPI with curl examples (GET endpoints can be tried in place), and the MCP tool list with the connect command.
+
+![Console: API page](docs/assets/console-api.en.png)
 
 ## REST API
 
@@ -193,8 +199,8 @@ The browser and the extension stay on the host; as long as the port is published
 
 ```
 backend/   FastAPI backend: api/ ws/ tasks/ collect/ download/ platforms/ mcp/ models/ storage/ ui/
-extension/ MV3 extension: background/ (WS client, tab routing) content/ (bridge) page/ (hooks and page actions) platforms/ popup/
-docs/      per-platform endpoint notes
+extension/ MV3 extension: background/ (WS client, tab routing) content/ (bridge) page/ (hooks and page actions) platforms/ popup/ work/
+docs/      per-platform endpoint notes, README images
 scripts/   end-to-end test and sampling scripts
 data/      runtime files: token, SQLite, recorded samples, downloads, logs (not committed)
 ```

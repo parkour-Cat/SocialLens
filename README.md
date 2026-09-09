@@ -1,23 +1,26 @@
+<div align="center">
+
+<img src="docs/assets/logos/bilibili.png" width="28" alt=""> <img src="docs/assets/logos/xiaohongshu.png" width="28" alt=""> <img src="docs/assets/logos/douyin.png" width="28" alt=""> <img src="docs/assets/logos/kuaishou.png" width="28" alt=""> <img src="docs/assets/logos/weixin_mp.png" width="28" alt=""> <img src="docs/assets/logos/youtube.png" width="28" alt=""> <img src="docs/assets/logos/x.png" width="28" alt=""> <img src="docs/assets/logos/reddit.png" width="28" alt=""> <img src="docs/assets/logos/zhihu.png" width="28" alt=""> <img src="docs/assets/logos/tiktok.png" width="28" alt=""> <img src="docs/assets/logos/instagram.png" width="28" alt=""> <img src="docs/assets/logos/linkedin.png" width="28" alt=""> <img src="docs/assets/logos/toutiao.png" width="28" alt="">
+
 # SocialLens
+
+**把你浏览器里已经登录的社交媒体账号，变成一个本地 API。**
 
 中文 | [English](README.en.md)
 
-把你浏览器里已经登录的社交媒体账号变成一个本地 API。
+![platforms](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-14-0f766e) ![python](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white) ![fastapi](https://img.shields.io/badge/FastAPI-REST-009688?logo=fastapi&logoColor=white) ![chrome](https://img.shields.io/badge/Chrome-MV3%20%E6%89%A9%E5%B1%95-4285f4?logo=googlechrome&logoColor=white) ![mcp](https://img.shields.io/badge/MCP-server-8a5cf6) ![local](https://img.shields.io/badge/%E5%8F%AA%E7%9B%91%E5%90%AC-127.0.0.1-555)
+
+</div>
 
 Chrome 扩展在你已登录的标签页里拦截和执行站点自己的请求，把数据交给本地 FastAPI 后端；后端在 `127.0.0.1:17800` 上提供统一的 REST 接口、MCP server 和一个网页控制台。不需要任何平台的 API key，后端也永远碰不到你的账号凭证。
 
-支持 14 个平台：B 站、小红书、抖音、快手、公众号、视频号（仅骨架）、YouTube、X、Reddit、知乎、TikTok、Instagram、LinkedIn、今日头条。
+![控制台：查询页与详情抽屉](docs/assets/console-query.png)
 
 > 仅供个人使用：用你自己的账号，看你自己能看到的内容。项目不做验证码识别、风控绕过和登录自动化；遇到验证码只报错并暂停队列，等你手动处理。
 
 ## 它是怎么工作的
 
-```
-你的 Chrome ──扩展──► ws://127.0.0.1:17800 ◄──REST / MCP / 控制台── 本地程序
-   │
-   └─ 在已登录的站点标签页里：拦截站点自己发出的请求（MAIN world hook fetch / XHR），
-      或在页面上下文里执行站点自己的接口调用，把原始响应交给后端
-```
+![架构](docs/assets/architecture.png)
 
 - **扩展尽量薄**：只做拦截和执行两件事。解析、归一化、存储、对外接口全在后端。
 - **两种取数策略**：`call` 是在标签页里直接调站点接口（B 站、Reddit 这类接口不签名或签名可复现的平台）；`navigate` 是打开站点页面、只捕获站点自己发出的请求（小红书、抖音、Instagram 这类接口带不可复现签名的平台），翻页靠在同一个标签页里滚动或点击。
@@ -29,20 +32,20 @@ Chrome 扩展在你已登录的标签页里拦截和执行站点自己的请求�
 
 | 平台 | 搜索内容 | 搜索用户 | 帖子详情 | 评论 | 评论回复 | 用户资料 | 用户帖子 | 推荐流 | 热榜 | 下载 |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| B 站 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ |
-| 小红书 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 抖音 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 快手 | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ | ✓ | – | ✓ |
-| 公众号 | – | ✓ | ✓ | – | – | ✓ | 待验证 | – | – | ✓ |
-| 视频号 | – | – | – | – | – | – | – | – | – | – |
-| YouTube | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| X | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Reddit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 知乎 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| TikTok | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Instagram | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| LinkedIn | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | 未验证 |
-| 今日头条 | ✓ | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/bilibili.png" width="16" alt=""> B 站 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ |
+| <img src="docs/assets/logos/xiaohongshu.png" width="16" alt=""> 小红书 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/douyin.png" width="16" alt=""> 抖音 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/kuaishou.png" width="16" alt=""> 快手 | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ | ✓ | – | ✓ |
+| <img src="docs/assets/logos/weixin_mp.png" width="16" alt=""> 公众号 | – | ✓ | ✓ | – | – | ✓ | 待验证 | – | – | ✓ |
+| <img src="docs/assets/logos/weixin_channels.png" width="16" alt=""> 视频号 | – | – | – | – | – | – | – | – | – | – |
+| <img src="docs/assets/logos/youtube.png" width="16" alt=""> YouTube | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/x.png" width="16" alt=""> X | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/reddit.png" width="16" alt=""> Reddit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/zhihu.png" width="16" alt=""> 知乎 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/tiktok.png" width="16" alt=""> TikTok | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/instagram.png" width="16" alt=""> Instagram | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| <img src="docs/assets/logos/linkedin.png" width="16" alt=""> LinkedIn | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | 未验证 |
+| <img src="docs/assets/logos/toutiao.png" width="16" alt=""> 今日头条 | ✓ | – | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 打勾的都经过真实浏览器验证并有 parser 测试。空的是平台网页端没有对应入口，或老接口已下线。每个平台的接口映射、翻页方式、已知坑都记在 [docs/platforms/](docs/platforms/) 里。
 
@@ -87,10 +90,14 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 
 后端起来后打开 http://127.0.0.1:17800/ 。单个静态页面，没有构建步骤，深色模式跟随系统，语言跟随浏览器，侧栏底部可切换中英文。
 
+![控制台：概览](docs/assets/console-overview.png)
+
 - **概览**：每个平台一块砖，显示登录状态、队列状态和页面加载配额用量；风控导致队列暂停时顶部出提示，可一键恢复；右侧是最近任务和下载进度。
-- **查询**：选平台、动作、参数，"一页"或"连续到 N 条"两种模式；结果按帖子、用户、评论、话题换列，评论按楼层展示、可就地展开回复；点一行滑出详情抽屉，可翻页、导出 JSON / CSV。顶部输入框粘链接、id 或关键词可直达。
+- **查询**：选平台、动作、参数，"一页"或"连续到 N 条"两种模式；结果按帖子、用户、评论、话题换列，评论按楼层展示、可就地展开回复；点一行滑出详情抽屉（指标、媒体、引用的帖子和链接卡片、原始 JSON），可翻页、导出 JSON / CSV。结果按平台各自保留，顶部输入框粘链接、id 或关键词可直达。
 - **连续拉取、下载、任务、缓存**：任务列表带进度和取消；查询过的数据都在本地 SQLite，可按平台浏览和导出。
 - **接口**：各平台能力矩阵（悬停平台图标看该平台说明）、从 OpenAPI 生成的 REST 列表（带 curl 示例，GET 可直接试）、MCP 的 tool 列表和接入命令。
+
+![控制台：接口页](docs/assets/console-api.png)
 
 ## REST 接口
 
@@ -192,8 +199,8 @@ docker run --rm -p 127.0.0.1:17800:17800 -v "$PWD/data:/data" sociallens-backend
 
 ```
 backend/   FastAPI 后端：api/ ws/ tasks/ collect/ download/ platforms/ mcp/ models/ storage/ ui/
-extension/ MV3 扩展：background/（WS 客户端、标签页路由）content/（桥接）page/（拦截与页面动作）platforms/ popup/
-docs/      各平台接口笔记
+extension/ MV3 扩展：background/（WS 客户端、标签页路由）content/（桥接）page/（拦截与页面动作）platforms/ popup/ work/
+docs/      各平台接口笔记、README 用图
 scripts/   端到端测试与录样本脚本
 data/      运行时生成：token、SQLite、录制样本、下载、日志（不入库）
 ```
