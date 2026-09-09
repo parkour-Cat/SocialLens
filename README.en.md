@@ -90,8 +90,6 @@ The backend recognises the extension by the fixed extension id from the `key` fi
 
 Open http://127.0.0.1:17800/ once the backend runs. A single static page, no build step, dark mode follows the system. The language follows the browser and can be switched at the bottom of the sidebar (Chinese / English).
 
-![Console: overview](docs/assets/console-overview.en.png)
-
 - **Overview**: one tile per platform with login state, queue state and the page-load budget; a banner with a one-click resume when risk control paused a queue; recent tasks and download progress.
 - **Query**: pick a platform, an action and parameters, in "one page" or "up to N items" mode. Results switch columns for posts, users, comments and topics; comments render as threads with inline reply loading; a row opens a detail drawer (metrics, media, quoted posts and link cards, raw JSON). Paging, JSON / CSV export. Results are kept per platform, and the top input resolves pasted links, ids or keywords.
 - **Collect, Downloads, Tasks, Cache**: task lists with progress and cancel; everything queried is stored in local SQLite and can be browsed and exported by platform.
