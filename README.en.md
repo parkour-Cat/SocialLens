@@ -205,8 +205,14 @@ data/      runtime files: token, SQLite, recorded samples, downloads, logs (not 
 
 ## Disclaimer
 
-- This is a personal learning and self-use tool. It is not affiliated with, authorised by or endorsed by Bilibili, Xiaohongshu, Douyin, Kuaishou, WeChat, YouTube, X, Reddit, Zhihu, TikTok, Instagram, LinkedIn, Toutiao or any other platform. Platform names and logos belong to their respective owners and are used for identification only.
-- It only turns what you can already see after signing in to your own browser into a local API. It provides no accounts, credentials or data, and bypasses no access control. Rights to the data belong to the platforms and the content authors; what you do with the data you obtain is your own responsibility.
-- Before using it, read and follow each platform's terms of service and robots rules, as well as the laws in your jurisdiction on data scraping, personal information and copyright. Do not use it for commercial harvesting, bulk collection of other people's data, privacy violations or anything unlawful.
-- Automated access can trigger a platform's risk control: captchas, rate limits or even account restrictions. The project keeps request rates low but makes no guarantees; any account risk is yours to bear.
-- The project is provided "as is", without warranty of any kind, express or implied, including fitness for a particular purpose, accuracy or continued availability. Platform APIs change without notice and features may stop working. The authors accept no liability for any direct or indirect loss arising from its use.
+This project is for learning and research purposes only and must not be used for any commercial activity; please delete it within 24 hours of downloading. Users must comply with the laws and regulations of their jurisdiction when using this project. Neither the project nor its author bears any responsibility for the consequences of unlawful use.
+
+This project may contain unknown defects and risks (including but not limited to device damage and account bans). Users bear all risks and liabilities arising from its use. The author makes no guarantee of the project's accuracy, completeness, timeliness or reliability, and accepts no liability for any loss or damage arising from its use.
+
+By using this project you confirm that you have read and agree to this disclaimer in full. If you have any doubt about, or do not agree with, the statements above, do not use the project's code or features. If you do use them, you are deemed to have fully understood and accepted this disclaimer and to voluntarily bear all risks and consequences of using the project.
+
+The intellectual property of this project belongs to its developer. The project is protected by copyright law, international copyright treaties and other intellectual property laws and treaties. Users may download and use the project provided they comply with this disclaimer and the applicable laws and regulations.
+
+The project is not affiliated with any platform mentioned herein; platform names and logos belong to their respective owners and are used for identification only.
+
+The developer holds the final right of interpretation of this project and reserves the right to change or update this disclaimer at any time.
