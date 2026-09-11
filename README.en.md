@@ -202,3 +202,11 @@ docs/      per-platform endpoint notes, README images
 scripts/   end-to-end test and sampling scripts
 data/      runtime files: token, SQLite, recorded samples, downloads, logs (not committed)
 ```
+
+## Disclaimer
+
+- This is a personal learning and self-use tool. It is not affiliated with, authorised by or endorsed by Bilibili, Xiaohongshu, Douyin, Kuaishou, WeChat, YouTube, X, Reddit, Zhihu, TikTok, Instagram, LinkedIn, Toutiao or any other platform. Platform names and logos belong to their respective owners and are used for identification only.
+- It only turns what you can already see after signing in to your own browser into a local API. It provides no accounts, credentials or data, and bypasses no access control. Rights to the data belong to the platforms and the content authors; what you do with the data you obtain is your own responsibility.
+- Before using it, read and follow each platform's terms of service and robots rules, as well as the laws in your jurisdiction on data scraping, personal information and copyright. Do not use it for commercial harvesting, bulk collection of other people's data, privacy violations or anything unlawful.
+- Automated access can trigger a platform's risk control: captchas, rate limits or even account restrictions. The project keeps request rates low but makes no guarantees; any account risk is yours to bear.
+- The project is provided "as is", without warranty of any kind, express or implied, including fitness for a particular purpose, accuracy or continued availability. Platform APIs change without notice and features may stop working. The authors accept no liability for any direct or indirect loss arising from its use.
