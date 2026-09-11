@@ -205,14 +205,16 @@ data/      runtime files: token, SQLite, recorded samples, downloads, logs (not 
 
 ## Disclaimer
 
-This project is for learning and research purposes only and must not be used for any commercial activity; please delete it within 24 hours of downloading. Users must comply with the laws and regulations of their jurisdiction when using this project. Neither the project nor its author bears any responsibility for the consequences of unlawful use.
+**Scope of use.** This project exists for personal learning, technical research and managing your own account data. It must not be used for commercial harvesting, data resale or any other for-profit activity. If you do not intend to use it within these limits, delete it within 24 hours of downloading.
 
-This project may contain unknown defects and risks (including but not limited to device damage and account bans). Users bear all risks and liabilities arising from its use. The author makes no guarantee of the project's accuracy, completeness, timeliness or reliability, and accepts no liability for any loss or damage arising from its use.
+**Lawful use.** You are responsible for complying with the laws of your jurisdiction and the terms of service of each platform. Consequences of unlawful or non-compliant use are yours alone; the project and its author have no part in them.
 
-By using this project you confirm that you have read and agree to this disclaimer in full. If you have any doubt about, or do not agree with, the statements above, do not use the project's code or features. If you do use them, you are deemed to have fully understood and accepted this disclaimer and to voluntarily bear all risks and consequences of using the project.
+**Use at your own risk.** The project may contain unknown defects. Automated access may also be flagged by a platform as abnormal, leading to captchas, rate limits, account restrictions or bans; the project keeps request rates deliberately low but cannot rule this out. All risk and loss concerning devices, accounts and data rests with the user.
 
-The intellectual property of this project belongs to its developer. The project is protected by copyright law, international copyright treaties and other intellectual property laws and treaties. Users may download and use the project provided they comply with this disclaimer and the applicable laws and regulations.
+**No warranty.** The project is provided "as is". The author does not guarantee its accuracy, completeness, timeliness or availability; platform APIs change without notice and features may stop working. The author accepts no liability for any direct or indirect loss arising from its use.
 
-The project is not affiliated with any platform mentioned herein; platform names and logos belong to their respective owners and are used for identification only.
+**No affiliation.** The project is not connected to, authorised by or endorsed by any platform mentioned here. Platform names and logos belong to their respective owners and appear only for identification.
 
-The developer holds the final right of interpretation of this project and reserves the right to change or update this disclaimer at any time.
+**Intellectual property.** The code and documentation are protected by copyright law and the relevant international treaties, and belong to the developer. You may download, use and modify the project provided you comply with this disclaimer and applicable law.
+
+**Acceptance.** Using the project's code or features means you have read and accept everything above and voluntarily take on the associated risks and consequences. If you do not agree, do not use it. The developer may revise this disclaimer at any time and has the final say on its interpretation.
