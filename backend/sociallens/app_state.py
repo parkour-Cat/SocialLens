@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from .config import Settings
 from .collect import CollectManager
 from .download import DownloadManager
+from .health import HealthManager
 from .platforms.registry import PlatformRegistry
 from .storage.db import Database
 from .storage.raw import RawStore
@@ -25,3 +26,4 @@ class AppState:
     tasks: TaskManager
     downloads: DownloadManager
     collects: CollectManager
+    health: HealthManager

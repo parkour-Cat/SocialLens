@@ -94,6 +94,30 @@ def build_server(base_url: str | None = None) -> MCPServer:
     async def resume(platform: str) -> dict[str, Any]:
         return await backend.call("POST", f"/api/v1/{platform}/resume")
 
+    @server.tool(description="Past list queries made through this tool (search, comments, user posts, feed, trending, collect), newest first: when, platform, action, key, item count, source. Filter by platform / action / a substring of the key. Use get_query for the items of one.")
+    async def query_history(platform: str | None = None, action: str | None = None, q: str | None = None, limit: int = 50) -> dict[str, Any]:
+        return await backend.call("GET", "/api/v1/queries", {"platform": platform, "action": action, "q": q, "limit": limit})
+
+    @server.tool(description="The items a past query returned (as cached now), each with metrics_then: the metric snapshot at the time of that query.")
+    async def get_query(query_id: int) -> dict[str, Any]:
+        return await backend.call("GET", f"/api/v1/queries/{query_id}")
+
+    @server.tool(description="Metric snapshots of one cached post or user over time (likes, comments, views, followers...), oldest first; one snapshot per observed change. kind is posts or users.")
+    async def item_history(kind: str, platform: str, item_id: str) -> dict[str, Any]:
+        return await backend.call("GET", f"/api/v1/items/{kind}/{platform}/{item_id}/history")
+
+    @server.tool(description="Known issues: what does not work and why (open bugs, unverified code, site limits, deliberate choices), per platform. Read it before investigating a failing platform.")
+    async def known_issues(platform: str | None = None) -> dict[str, Any]:
+        return await backend.call("GET", "/api/v1/known-issues", {"platform": platform})
+
+    @server.tool(description="Platform health: the latest probe per platform (ok / broken / blocked / skipped, with broken_since and last_ok_at). check=true runs the probes now (one cheap page load per platform) and waits for them; use it when a platform keeps failing to tell a site change (broken) from a login or captcha problem (blocked).")
+    async def health(check: bool = False) -> dict[str, Any]:
+        if check:
+            await backend.call("POST", "/api/v1/health/check", body={"wait": True})
+        out = await backend.call("GET", "/api/v1/health/platforms")
+        out["risk"] = (await backend.call("GET", "/api/v1/risk/events", {"limit": 20})).get("data")
+        return out
+
     @server.tool(description="Look up a task by id (state, result, error) for long-running calls that returned a task_id.")
     async def get_task(task_id: str) -> dict[str, Any]:
         return await backend.call("GET", f"/api/v1/tasks/{task_id}")

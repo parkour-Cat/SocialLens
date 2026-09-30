@@ -107,6 +107,10 @@ Every response is `{"success": true, "data": ...}` or `{"success": false, "error
 | GET | `/api/v1/platforms` | registered platforms and their capabilities |
 | GET | `/api/v1/resolve?q=` | which platform and object a link / id points to |
 | GET | `/api/v1/{platform}/search?keyword=&type=post\|user&cursor=` | search |
+| GET | `/api/v1/queries?platform=&action=&q=&limit=` | query history (every list query records the ids it returned); `GET /api/v1/queries/{id}` returns those items with `metrics_then`; `GET /api/v1/items/{kind}/{platform}/{id}/history` is the item's metric snapshots (one per observed change) |
+| GET | `/api/v1/known-issues?platform=` | known issues (open / unverified / site limit / by design) |
+| GET | `/api/v1/risk/events?platform=&limit=` | risk-control hits (captcha / rate limit) with the page loads, tasks and callers of the previous 10 / 60 minutes; recorded only, to learn each site's real thresholds |
+| GET | `/api/v1/health/platforms` | per-platform probe state (ok / broken / blocked / skipped, broken_since); `POST /api/v1/health/check` probes now; runs every 6 h by default (`SOCIALLENS_HEALTH_INTERVAL_MIN`, 0 disables) |
 | GET | `/api/v1/search?keyword=&platforms=a,b,c&type=post\|user` | search several platforms at once: parallel, each under its own rate limit, results grouped per platform with their own cursor and error |
 | GET | `/api/v1/{platform}/posts/{id}` | post detail |
 | GET | `/api/v1/{platform}/posts/{id}/comments?cursor=` | comments |
@@ -153,7 +157,7 @@ claude mcp add sociallens -- uv run --project /path/to/SocialLens/backend social
 }
 ```
 
-Tools: `status`, `list_platforms`, `get_capabilities`, `search` (pass comma-separated platform ids to search several at once), `get_post`, `get_comments`, `get_replies`, `get_user`, `get_user_posts`, `get_feed`, `get_trending`, `collect`, `download`, `list_downloads`, `get_task`, `resume`. Backend errors (`not_logged_in`, `captcha_required`, `cursor_expired`, …) are passed through as tool errors.
+Tools: `status`, `list_platforms`, `get_capabilities`, `search` (pass comma-separated platform ids to search several at once), `get_post`, `get_comments`, `get_replies`, `get_user`, `get_user_posts`, `get_feed`, `get_trending`, `collect`, `download`, `list_downloads`, `get_task`, `resume`, `health`, `known_issues`, `query_history`, `get_query`, `item_history`. Backend errors (`not_logged_in`, `captcha_required`, `cursor_expired`, …) are passed through as tool errors.
 
 ## Downloads and proxies
 
@@ -172,7 +176,8 @@ Downloads and yt-dlp follow the system proxy by default (`HTTPS_PROXY`, otherwis
 
 ```bash
 cd backend && uv run pytest                    # backend tests; a fake extension speaks the real WebSocket protocol
-cd extension && pnpm typecheck                 # extension type check
+cd extension && pnpm typecheck
+pnpm test                 # extension type check
 
 # real-browser end to end (backend running, extension built; install Playwright's Chromium once)
 cd backend && uv run python -m playwright install chromium

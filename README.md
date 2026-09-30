@@ -107,6 +107,10 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 | GET | `/api/v1/platforms` | 已注册平台及其能力 |
 | GET | `/api/v1/resolve?q=` | 识别一条链接 / id 属于哪个平台、哪个对象 |
 | GET | `/api/v1/{platform}/search?keyword=&type=post\|user&cursor=` | 搜索 |
+| GET | `/api/v1/queries?platform=&action=&q=&limit=` | 查询历史（每次列表查询记下返回的条目 id）；`GET /api/v1/queries/{id}` 取当时的条目并附 `metrics_then`；`GET /api/v1/items/{kind}/{platform}/{id}/history` 是该条目的指标快照序列（指标每次变化存一份） |
+| GET | `/api/v1/known-issues?platform=` | 已知问题清单（未解决 / 待验证 / 站点限制 / 有意为之） |
+| GET | `/api/v1/risk/events?platform=&limit=` | 风控命中记录（验证码 / 限流）及其之前 10 / 60 分钟的页面加载、任务、调用来源；只记录不干预，用来摸各站真实阈值 |
+| GET | `/api/v1/health/platforms` | 各平台探测状态（ok / broken / blocked / skipped、broken_since）；`POST /api/v1/health/check` 立即探测，默认每 6 小时自动跑一次（`SOCIALLENS_HEALTH_INTERVAL_MIN`，0 关闭） |
 | GET | `/api/v1/search?keyword=&platforms=a,b,c&type=post\|user` | 多平台同时搜索：各平台并行、各自限速，结果按平台分组，每组自带 cursor 和 error |
 | GET | `/api/v1/{platform}/posts/{id}` | 帖子详情 |
 | GET | `/api/v1/{platform}/posts/{id}/comments?cursor=` | 评论 |
@@ -153,7 +157,7 @@ claude mcp add sociallens -- uv run --project /path/to/SocialLens/backend social
 }
 ```
 
-tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform 传逗号分隔的多个平台即多平台并行搜索）、`get_post`、`get_comments`、`get_replies`、`get_user`、`get_user_posts`、`get_feed`、`get_trending`、`collect`、`download`、`list_downloads`、`get_task`、`resume`。后端的错误（`not_logged_in`、`captcha_required`、`cursor_expired` 等）原样作为 tool error 交给模型。
+tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform 传逗号分隔的多个平台即多平台并行搜索）、`get_post`、`get_comments`、`get_replies`、`get_user`、`get_user_posts`、`get_feed`、`get_trending`、`collect`、`download`、`health`、`known_issues`、`query_history`、`get_query`、`item_history`、`list_downloads`、`get_task`、`resume`。后端的错误（`not_logged_in`、`captcha_required`、`cursor_expired` 等）原样作为 tool error 交给模型。
 
 ## 下载与代理
 
@@ -172,7 +176,8 @@ tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform �
 
 ```bash
 cd backend && uv run pytest                    # 后端测试，用假扩展走真实 WebSocket 协议
-cd extension && pnpm typecheck                 # 扩展类型检查
+cd extension && pnpm typecheck
+pnpm test                 # 扩展类型检查
 
 # 真浏览器端到端（后端在跑、扩展已 build，首次要装 Playwright 的 Chromium）
 cd backend && uv run python -m playwright install chromium

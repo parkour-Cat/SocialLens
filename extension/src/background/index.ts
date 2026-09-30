@@ -1,6 +1,8 @@
 // Service worker: keeps the WebSocket to the backend, routes tasks to platform tabs,
 // tracks per-platform tab/login state, forwards captures when a platform is recording.
 
+import { runUntilSettled } from "./settle";
+import { TabPool } from "./tabpool";
 import { pagePlatformActions } from "../page/platforms/catalog";
 import { platformById, platformForUrl, platforms, type PlatformDef } from "../platforms";
 import { hostMatches } from "../platforms/types";
@@ -191,18 +193,22 @@ async function handleBackend(msg: BackendToExt): Promise<void> {
 
 // ---- tabs -----------------------------------------------------------------------
 
-// Tabs we asked Chrome to close; tabs.query still lists them for a moment, and a task sent
-// there dies with "Receiving end does not exist".
-const closingTabs = new Set<number>();
-function closeTab(tabId: number): Promise<void> {
-  closingTabs.add(tabId);
-  return chrome.tabs.remove(tabId).catch(() => {});
-}
+// Tabs the extension owns (session / helper tabs in the work window), cursor keys, and which
+// tab a navigate task may take over: see tabpool.ts (unit-tested, no chrome.* inside).
+const pool = new TabPool({
+  getTab: async (id) => {
+    const t = await chrome.tabs.get(id).catch(() => null);
+    return t?.id != null ? { id: t.id, url: t.url, pendingUrl: t.pendingUrl, index: t.index, windowId: t.windowId } : null;
+  },
+  removeTab: (id) => chrome.tabs.remove(id).catch(() => {}),
+  reachable: (id) => waitContentReady(id, 1_500).then(() => true, () => false),
+  log: (msg, ...args) => log.debug(msg, ...args),
+});
 
 async function tabsForPlatform(def: PlatformDef): Promise<chrome.tabs.Tab[]> {
   const all = await chrome.tabs.query({});
   return all.filter((t) => {
-    if (!t.url || t.id == null || closingTabs.has(t.id)) return false;
+    if (!t.url || t.id == null || pool.isClosing(t.id)) return false;
     try {
       return hostMatches(def, new URL(t.url).hostname);
     } catch {
@@ -324,7 +330,7 @@ async function pushCaptureConfig(platformId: string): Promise<void> {
 async function findOrOpenTab(def: PlatformDef): Promise<number> {
   const tabs = await tabsForPlatform(def);
   const ready = tabs.filter((t) => t.status === "complete" && !t.discarded);
-  const ours = (id: number) => helperTabs.has(id) || sessionTabs.has(id);
+  const ours = (id: number) => pool.owns(id);
   // Our own helper / session tabs first (keeps the user's tabs untouched), then the user's, most recent first.
   ready.sort((a, b) => Number(ours(b.id!)) - Number(ours(a.id!)) || Number(b.active) - Number(a.active) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
   // Tabs opened before the extension was (re)loaded have no live content script; skip them.
@@ -332,23 +338,19 @@ async function findOrOpenTab(def: PlatformDef): Promise<number> {
     const reachable = await waitContentReady(t.id!, 1_500).then(() => true, () => false);
     remoteLog("info", "tab probe", { platform: def.id, tab: t.id, url: (t.url ?? "").slice(0, 60), reachable });
     if (reachable) {
-      const h = helperTabs.get(t.id!);
-      if (h) h.lastUsed = Date.now();
+      pool.touch(t.id!);
       return t.id!;
     }
   }
   // No usable tab: open one helper tab per platform in the work window (never in the user's
   // window), reuse it for later in-tab calls, and let the idle sweep close it.
-  for (const [tabId, h] of helperTabs) {
-    if (h.platform === def.id) {
-      helperTabs.delete(tabId);
-      await closeTab(tabId); // unreachable (stale build / discarded): replace it
-    }
+  for (const [tabId, h] of [...pool.helperTabs]) {
+    if (h.platform === def.id) await pool.closeTab(tabId); // unreachable (stale build / discarded): replace it
   }
   log.info("opening tab for", def.id);
   remoteLog("info", "opening helper tab", { platform: def.id, ready_tabs: ready.length, all_tabs: tabs.length });
   const tab = await createInWorkWindow(def.homeUrl, false);
-  helperTabs.set(tab.id!, { platform: def.id, lastUsed: Date.now() });
+  pool.addHelper(tab.id!, def.id);
   const t0 = Date.now();
   try {
     await waitContentReady(tab.id!, 30_000);
@@ -427,117 +429,7 @@ async function openWorkTab(url: string, index?: number): Promise<chrome.tabs.Tab
   return createInWorkWindow(url, true, index);
 }
 
-// ---- session tabs (kept open by navigate + keep_tab, reused for scroll pagination) ------
-
-// Tabs the extension owns. Session tabs: kept by navigate + keep_tab for cursor pagination.
-// Helper tabs: one per platform for in-tab calls when no usable tab exists. Both live in the
-// work window and are closed after SESSION_IDLE_MS unused; the user's own tabs are never closed.
-const sessionTabs = new Map<number, { platform: string; lastUsed: number; action?: string }>();
-const helperTabs = new Map<number, { platform: string; lastUsed: number }>();
-const busyTabs = new Set<number>(); // tabs with a navigate task in flight
-const SESSION_IDLE_MS = 5 * 60_000;
-const SESSION_MAX_PER_PLATFORM = 3; // beyond this the least recently used session tab is closed
-const SESSION_MAX_TOTAL = 8; // across all platforms
-
-// What goes out as `_tab` (and comes back inside a cursor) is a key naming a tab *and* the
-// document it showed at the time. Owned tabs get navigated to other pages when a later task
-// reuses them, so a bare tab id would let an old cursor scroll a page that shows something else.
-let cursorSeq = 0;
-const cursorKeys = new Map<number, { tabId: number; doc: string }>();
-
-function cursorKeyFor(tabId: number, doc: string): number {
-  for (const [key, c] of cursorKeys) if (c.tabId === tabId && c.doc === doc) return key;
-  if (cursorKeys.size >= 500) cursorKeys.delete(cursorKeys.keys().next().value!); // oldest first
-  cursorKeys.set(++cursorSeq, { tabId, doc });
-  return cursorSeq;
-}
-
-function withTab(value: unknown, key: number | undefined): unknown {
-  if (key == null) return value;
-  return value && typeof value === "object" && !Array.isArray(value) ? { ...(value as object), _tab: key } : { value, _tab: key };
-}
-
-/** Keep only the most recently used session tabs of a platform; old cursors then expire. */
-async function trimSessionTabs(platform: string): Promise<void> {
-  const mine = [...sessionTabs].filter(([, s]) => s.platform === platform).sort((a, b) => b[1].lastUsed - a[1].lastUsed);
-  for (const [tabId] of mine.slice(SESSION_MAX_PER_PLATFORM)) {
-    sessionTabs.delete(tabId);
-    await closeTab(tabId);
-    log.debug("closed surplus session tab", tabId, platform);
-  }
-  const all = [...sessionTabs].sort((a, b) => b[1].lastUsed - a[1].lastUsed);
-  for (const [tabId, s] of all.slice(SESSION_MAX_TOTAL)) {
-    sessionTabs.delete(tabId);
-    await closeTab(tabId);
-    log.debug("closed surplus session tab (total cap)", tabId, s.platform);
-  }
-}
-
-async function gcSessionTabs(): Promise<void> {
-  const now = Date.now();
-  for (const map of [sessionTabs, helperTabs]) {
-    for (const [tabId, s] of map) {
-      if (now - s.lastUsed > SESSION_IDLE_MS) {
-        map.delete(tabId);
-        await closeTab(tabId);
-        log.debug("closed idle tab", tabId, s.platform);
-      }
-    }
-  }
-  // The window itself stays open (see createInWorkWindow); only the placeholder is left behind.
-}
-chrome.tabs.onRemoved.addListener((id) => {
-  closingTabs.delete(id);
-  sessionTabs.delete(id);
-  helperTabs.delete(id);
-  for (const [key, c] of cursorKeys) if (c.tabId === id) cursorKeys.delete(key);
-});
-
-function sameUrl(a: string, b: string): boolean {
-  try {
-    const ua = new URL(a);
-    const ub = new URL(b);
-    ua.hash = ub.hash = "";
-    ua.searchParams.sort();
-    ub.searchParams.sort();
-    return ua.href.replace(/\/$/, "") === ub.href.replace(/\/$/, "");
-  } catch {
-    return a === b;
-  }
-}
-
-/** Actions that share one tab: any search replaces the previous search page. */
-const tabGroup = (action: string): string => (action.startsWith("search_") ? "search" : action);
-
-/**
- * An owned tab of this platform that a navigate task may take over (replace in place) instead of
- * opening another tab; the user wants one page per platform, not a new tab per search: a session
- * tab loaded by the same kind of action (a new search replaces the previous search page; its
- * cursor then expires), then the platform's helper tab, then, at the per-platform cap, the least
- * recently used session tab. Tasks without `keepTab` (get_post / get_user) only take the helper
- * tab so they never invalidate a pagination cursor. Returns null when a fresh tab is needed.
- */
-async function findReusableTab(platform: string, action: string, keepTab: boolean): Promise<number | null> {
-  const usable = async (tabId: number): Promise<boolean> => {
-    if (busyTabs.has(tabId)) return false;
-    const reachable = await waitContentReady(tabId, 1_500).then(() => true, () => false);
-    if (!reachable) {
-      sessionTabs.delete(tabId);
-      helperTabs.delete(tabId);
-      void closeTab(tabId);
-    }
-    return reachable;
-  };
-  const mine = [...sessionTabs].filter(([, s]) => s.platform === platform).sort((a, b) => b[1].lastUsed - a[1].lastUsed);
-  if (keepTab) {
-    for (const [tabId, s] of mine) if (s.action && tabGroup(s.action) === tabGroup(action) && (await usable(tabId))) return tabId;
-  }
-  for (const [tabId, h] of helperTabs) if (h.platform === platform && (await usable(tabId))) return tabId;
-  if (keepTab && mine.length >= SESSION_MAX_PER_PLATFORM) {
-    for (const [tabId] of mine.reverse()) if (await usable(tabId)) return tabId;
-  }
-  return null;
-}
+// ---- work window --------------------------------------------------------------------
 
 /** Bring the work window back when it was minimized: hidden tabs stop loading more. */
 async function restoreWorkWindow(): Promise<void> {
@@ -545,22 +437,6 @@ async function restoreWorkWindow(): Promise<void> {
   if (windowId == null) return;
   const w = await chrome.windows.get(windowId).catch(() => null);
   if (w?.state === "minimized") await chrome.windows.update(windowId, { state: "normal", focused: false }).catch(() => {});
-}
-
-/** A live session tab of this platform whose document is still on `url` (no in-page navigation since). */
-async function findSessionTab(platform: string, url: string): Promise<number | null> {
-  for (const [tabId, s] of [...sessionTabs].sort((a, b) => b[1].lastUsed - a[1].lastUsed)) {
-    if (s.platform !== platform) continue;
-    const tab = await chrome.tabs.get(tabId).catch(() => null);
-    // tab.url is the committed document; a still-"loading" status only means late resources.
-    if (!(tab?.url && !tab.pendingUrl && sameUrl(tab.url, url))) continue;
-    // A tab whose content script is gone (extension reloaded meanwhile) cannot be reused.
-    const reachable = await waitContentReady(tabId, 1_500).then(() => true, () => false);
-    if (reachable) return tabId;
-    sessionTabs.delete(tabId);
-    void closeTab(tabId);
-  }
-  return null;
 }
 
 // ---- task execution ----------------------------------------------------------------
@@ -611,19 +487,18 @@ async function executeTask(task: TaskSpec): Promise<unknown> {
   }
   // Continue in a tab kept open by an earlier navigate (pagination by scrolling).
   if (typeof task.params._tab === "number") {
-    const key = cursorKeys.get(task.params._tab);
-    const session = key && sessionTabs.get(key.tabId);
-    const alive = session && (await chrome.tabs.get(key.tabId).then(() => true, () => false));
+    const key = pool.resolveCursor(task.params._tab);
+    const alive = key && (await chrome.tabs.get(key.tabId).then(() => true, () => false));
     if (!key || !alive) throw new ExtError("cursor_expired", "the tab behind this cursor is gone; start again without a cursor");
-    if (busyTabs.has(key.tabId)) throw new ExtError("extension_error", "the tab behind this cursor is loading another page; retry shortly");
-    session!.lastUsed = Date.now();
+    if (pool.busy.has(key.tabId)) throw new ExtError("extension_error", "the tab behind this cursor is loading another page; retry shortly");
+    pool.touch(key.tabId);
     await chrome.tabs.update(key.tabId, { active: true }).catch(() => {}); // must be visible to load more
     const curDoc = await waitContentReady(key.tabId, 5_000);
     if (curDoc !== key.doc) {
       throw new ExtError("cursor_expired", "the page behind this cursor was replaced by a later task in the same tab; start again without a cursor");
     }
     const value = await executeInTab(key.tabId, task);
-    return withTab(value, task.params._tab);
+    return pool.withTab(value, task.params._tab);
   }
 
   if (cancelledTasks.delete(task.id)) throw new ExtError("cancelled", "cancelled");
@@ -639,14 +514,14 @@ async function executeTask(task: TaskSpec): Promise<unknown> {
     // A session tab already sitting on this URL (comments -> replies -> replies of one post) is
     // reused instead of loading the page again: fewer page loads is what keeps risk control quiet.
     // Its ring buffer still holds the earlier responses, so the action waits from time 0.
-    const reused = await findSessionTab(def.id, task.params.url);
-    const reusable = reused == null ? await findReusableTab(def.id, task.action, keepTab) : null;
+    const reused = await pool.findSessionTab(def.id, task.params.url);
+    const reusable = reused == null ? await pool.findReusableTab(def.id, task.action, keepTab) : null;
     let navTabId: number;
     let ownTab = false;
     if (reused != null) {
       navTabId = reused;
       since = 0;
-      sessionTabs.get(navTabId)!.lastUsed = Date.now();
+      pool.touch(navTabId);
       await chrome.tabs.update(navTabId, { active: true }).catch(() => {});
       remoteLog("info", "navigate: reusing session tab", { task_id: task.id, tab: navTabId, url: shortUrl });
     } else {
@@ -660,9 +535,7 @@ async function executeTask(task: TaskSpec): Promise<unknown> {
       if (reusable != null) {
         const old = await chrome.tabs.get(reusable).catch(() => null);
         index = old?.index;
-        sessionTabs.delete(reusable);
-        helperTabs.delete(reusable);
-        await closeTab(reusable);
+        await pool.closeTab(reusable);
         remoteLog("info", "navigate: replacing owned tab", { task_id: task.id, tab: reusable, url: shortUrl });
       } else {
         remoteLog("info", "navigate: opening work tab", { task_id: task.id, url: shortUrl });
@@ -672,13 +545,13 @@ async function executeTask(task: TaskSpec): Promise<unknown> {
       ownTab = true;
       remoteLog("info", "navigate: work tab created", { task_id: task.id, tab: navTabId, window: navTab.windowId, replaced: reusable ?? undefined });
     }
-    busyTabs.add(navTabId);
+    pool.busy.add(navTabId);
     try {
-      let doc = await waitContentReady(navTabId, Math.min(20_000, task.timeout_ms));
+      const doc = await waitContentReady(navTabId, Math.min(20_000, task.timeout_ms));
       log.debug("navigate: document", doc.slice(0, 8), "reachable after", Date.now() - since, "ms in tab", navTabId);
       if (keepTab && ownTab) {
-        sessionTabs.set(navTabId, { platform: def.id, lastUsed: Date.now(), action: task.action });
-        await trimSessionTabs(def.id);
+        pool.addSession(navTabId, def.id, task.action);
+        await pool.trimSessionTabs(def.id);
       }
       const pattern = task.params.capture_pattern;
       const pageAction = typeof task.params.page_action === "string" ? task.params.page_action : undefined;
@@ -688,45 +561,42 @@ async function executeTask(task: TaskSpec): Promise<unknown> {
         // interstitial ("Please wait..." bot checks, login bounces) replace the document after
         // load, which would strand the action: re-issue it in the new document when that happens.
         const pageParams = { ...((task.params.page_params as Record<string, unknown>) ?? {}), since };
-        let attempt = 0;
-        while (Date.now() < deadline) {
-          const runId = attempt === 0 ? task.id : `${task.id}:${doc.slice(0, 8)}`;
-          const running = executeInTab(navTabId, { ...task, id: runId, action: pageAction, params: pageParams });
+        const runId = (d: string, attempt: number) => (attempt === 0 ? task.id : `${task.id}:${d.slice(0, 8)}`);
+        const outcome = await runUntilSettled(doc, {
+          deadline,
+          run: (d, attempt) => executeInTab(navTabId, { ...task, id: runId(d, attempt), action: pageAction, params: pageParams }),
           // The replacement watch times out at the deadline: that is the action timing out, not a navigation problem.
-          const replaced = waitContentReady(navTabId, deadline - Date.now(), doc).then((d) => ({ replacedBy: d }), () => ({ replacedBy: null }));
-          const outcome = await Promise.race([running.then((v) => ({ value: v })), replaced]);
-          if ("value" in outcome) return withTab(outcome.value, keepTab ? cursorKeyFor(navTabId, doc) : undefined);
-          pendingPage.delete(runId);
-          sendToTab(navTabId, { type: "task.cancel", id: runId }).catch(() => {});
-          if (!outcome.replacedBy) break;
-          doc = outcome.replacedBy;
-          attempt++;
-          remoteLog("info", "navigate: document replaced, re-running page action", { task_id: task.id, tab: navTabId, doc: doc.slice(0, 8), attempt });
-        }
+          watchReplaced: (d, remaining) => waitContentReady(navTabId, remaining, d),
+          cancel: (d, attempt) => {
+            pendingPage.delete(runId(d, attempt));
+            sendToTab(navTabId, { type: "task.cancel", id: runId(d, attempt) }).catch(() => {});
+          },
+          onReplaced: (d, attempt) => remoteLog("info", "navigate: document replaced, re-running page action", { task_id: task.id, tab: navTabId, doc: d.slice(0, 8), attempt }),
+        });
+        if ("value" in outcome) return pool.withTab(outcome.value, keepTab ? pool.cursorKeyFor(navTabId, outcome.doc) : undefined);
         throw new ExtError("timeout", `page action ${pageAction} did not finish before the navigation settled`);
       }
       if (typeof pattern !== "string") {
-        return withTab({ navigated: task.params.url }, keepTab ? cursorKeyFor(navTabId, doc) : undefined);
+        return pool.withTab({ navigated: task.params.url }, keepTab ? pool.cursorKeyFor(navTabId, doc) : undefined);
       }
       // A site may chain documents (redirects, interstitials). Wait in the current document, but
       // if it gets replaced before a match arrives, re-issue the wait in the new one.
-      while (Date.now() < deadline) {
-        const remaining = deadline - Date.now();
-        const waitId = `${task.id}:${doc.slice(0, 8)}`;
-        const waiting = executeInTab(navTabId, { ...task, id: waitId, action: "wait_capture", params: { pattern, since, timeout_ms: remaining } });
-        const replaced = waitContentReady(navTabId, remaining, doc).then((d) => ({ replacedBy: d }), () => ({ replacedBy: null }));
-        const outcome = await Promise.race([waiting.then((v) => ({ value: v })), replaced]);
-        if ("value" in outcome) return withTab(outcome.value, keepTab ? cursorKeyFor(navTabId, doc) : undefined);
-        pendingPage.delete(waitId);
-        sendToTab(navTabId, { type: "task.cancel", id: waitId }).catch(() => {});
-        if (!outcome.replacedBy) break;
-        doc = outcome.replacedBy;
-        log.debug("navigate: document replaced, re-waiting in", doc.slice(0, 8));
-      }
+      const waitId = (d: string) => `${task.id}:${d.slice(0, 8)}`;
+      const outcome = await runUntilSettled(doc, {
+        deadline,
+        run: (d) => executeInTab(navTabId, { ...task, id: waitId(d), action: "wait_capture", params: { pattern, since, timeout_ms: deadline - Date.now() } }),
+        watchReplaced: (d, remaining) => waitContentReady(navTabId, remaining, d),
+        cancel: (d) => {
+          pendingPage.delete(waitId(d));
+          sendToTab(navTabId, { type: "task.cancel", id: waitId(d) }).catch(() => {});
+        },
+        onReplaced: (d) => log.debug("navigate: document replaced, re-waiting in", d.slice(0, 8)),
+      });
+      if ("value" in outcome) return pool.withTab(outcome.value, keepTab ? pool.cursorKeyFor(navTabId, outcome.doc) : undefined);
       throw new ExtError("timeout", `no captured response matching ${pattern} before the navigation settled`);
     } finally {
-      busyTabs.delete(navTabId);
-      if (!keepTab && ownTab) await closeTab(navTabId);
+      pool.busy.delete(navTabId);
+      if (!keepTab && ownTab) await pool.closeTab(navTabId);
     }
   }
   const tabId = await findOrOpenTab(def);
@@ -819,7 +689,10 @@ chrome.runtime.onMessage.addListener((msg: ContentToBg | PopupToBg, sender, send
   return false;
 });
 
-chrome.tabs.onRemoved.addListener((id) => tabPlatform.delete(id));
+chrome.tabs.onRemoved.addListener((id) => {
+  tabPlatform.delete(id);
+  pool.forget(id);
+});
 
 async function buildStatus(): Promise<ExtStatus> {
   const cfg = currentConfig ?? (await loadConfig());
@@ -890,7 +763,7 @@ chrome.alarms.create(ALARM, { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name !== ALARM) return;
   if (!connected) void connect();
-  void gcSessionTabs();
+  void pool.gcSessionTabs();
 });
 chrome.runtime.onStartup.addListener(() => void connect());
 chrome.runtime.onInstalled.addListener(() => {

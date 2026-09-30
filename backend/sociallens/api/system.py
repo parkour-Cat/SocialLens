@@ -29,5 +29,6 @@ async def status(request: Request):
             "extension": st.hub.status(),
             "platforms": platforms,
             "queues": st.tasks.status(),
+            "diagnosis": st.tasks.diagnosis(),
         }
     )

@@ -7,7 +7,8 @@ extension one at a time with the platform's rate limit, the adapter parses the r
 from __future__ import annotations
 
 import asyncio
-from collections import deque
+from collections import Counter, deque
+from datetime import datetime, timezone
 import random
 import time
 from typing import Any, Awaitable, Callable
@@ -39,6 +40,28 @@ GENERIC_ACTIONS: dict[str, Capability] = {
 }
 
 
+HISTORY_S = 3600.0  # how much dispatch history a queue keeps for risk evidence
+STUCK_MIN_TIMEOUTS = 2
+
+
+def diagnose(unreached: list[dict[str, Any]], online: bool) -> dict[str, Any] | None:
+    """The one failure mode that looks like "everything is broken" but is Chrome itself: the
+    extension's service worker keeps answering (online, pongs), yet page-level tasks time out
+    without their tab ever answering. That is Chrome refusing to load new tabs (a known state
+    after too many tabs piled up); the fix is to quit and reopen Chrome, not to debug code."""
+    if not online or len(unreached) < STUCK_MIN_TIMEOUTS:
+        return None
+    return {
+        "chrome_stuck": {
+            "since": unreached[0]["at"],
+            "tasks": len(unreached),
+            "platforms": sorted({u["platform"] for u in unreached}),
+            "hint": "扩展后台在线，但页面任务的标签页始终没有加载：多半是 Chrome 卡住了。完全退出 Chrome（包括托盘）再重开。",
+            "hint_en": "The extension is online but the tabs of page-level tasks never answered: Chrome is most likely stuck. Quit Chrome completely (tray too) and reopen it.",
+        }
+    }
+
+
 class _PlatformQueue:
     def __init__(self) -> None:
         self.queue: asyncio.Queue[Task] = asyncio.Queue()
@@ -48,6 +71,42 @@ class _PlatformQueue:
         self.running: Task | None = None
         self.page_loads: deque[float] = deque()  # monotonic times of recent fresh page loads
         self.budget_wait_until: float = 0.0
+        # Evidence for the risk-event log (see record_risk): what this queue sent the site in the
+        # last hour, which callers were active, and when it was last hit.
+        self.dispatches: deque[tuple[float, str, bool]] = deque()  # (monotonic, action, page_load)
+        self.contexts: deque[tuple[float, str]] = deque()  # (monotonic, tag) e.g. multi_search / health / collect
+        self.risk_hits: deque[float] = deque()
+
+    def note_dispatch(self, action: str, page_load: bool) -> None:
+        now = time.monotonic()
+        self.dispatches.append((now, action, page_load))
+        while self.dispatches and self.dispatches[0][0] < now - HISTORY_S:
+            self.dispatches.popleft()
+
+    def note_context(self, tag: str) -> None:
+        now = time.monotonic()
+        self.contexts.append((now, tag))
+        while self.contexts and self.contexts[0][0] < now - HISTORY_S:
+            self.contexts.popleft()
+
+    def evidence(self) -> dict[str, Any]:
+        """Traffic this queue produced before now: page loads and tasks in the last 10 / 60 min,
+        actions, the tightest gap between dispatches, active callers, time since the last hit."""
+        now = time.monotonic()
+        last10 = [d for d in self.dispatches if d[0] >= now - 600]
+        last60 = [d for d in self.dispatches if d[0] >= now - HISTORY_S]
+        gaps = [b[0] - a[0] for a, b in zip(last10, last10[1:])]
+        return {
+            "page_loads_10m": sum(1 for d in last10 if d[2]),
+            "page_loads_60m": sum(1 for d in last60 if d[2]),
+            "tasks_10m": len(last10),
+            "tasks_60m": len(last60),
+            "actions_60m": dict(Counter(d[1] for d in last60)),
+            "min_gap_s_10m": round(min(gaps), 1) if gaps else None,
+            "contexts_10m": sorted({c[1] for c in self.contexts if c[0] >= now - 600}),
+            "since_last_hit_s": round(now - self.risk_hits[-1]) if self.risk_hits else None,
+            "hits_24h": sum(1 for t in self.risk_hits if t >= now - 86400),
+        }
 
     def prune_page_loads(self, window_s: float) -> None:
         cutoff = time.monotonic() - window_s
@@ -80,6 +139,7 @@ class TaskManager:
         self.default_timeout_s = default_timeout_s
         self.pause_on_rate_limit_s = pause_on_rate_limit_s
         self._queues: dict[str, _PlatformQueue] = {}
+        self._unreached: list[dict[str, Any]] = []  # page-level timeouts whose tab never answered
         self._tasks: dict[str, Task] = {}
         self._done: dict[str, asyncio.Event] = {}
         self._external_cancel: dict[str, Callable[[], Awaitable[None]]] = {}
@@ -106,6 +166,33 @@ class TaskManager:
 
     def status(self) -> dict[str, Any]:
         return {pid: q.status() for pid, q in self._queues.items()}
+
+    def diagnosis(self) -> dict[str, Any] | None:
+        """See diagnose(): non-None while Chrome looks stuck; clears on the next page task that answers."""
+        return diagnose(self._unreached, self.hub.online)
+
+    def note_context(self, platform: str, tag: str) -> None:
+        """Tag the platform's traffic with the caller (multi_search / health / collect) for risk evidence."""
+        self._ensure_queue(platform).note_context(tag)
+
+    def record_risk(self, task: Task, q: _PlatformQueue, err: SocialLensError) -> dict[str, Any]:
+        """Append a risk event (captcha / rate limit) with the traffic that preceded it. Pure
+        bookkeeping: nothing changes behaviour, the point is to learn the sites' thresholds."""
+        ev = {
+            "platform": task.platform,
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "code": err.raw_code,
+            "message": err.message[:300],
+            "action": task.action,
+            "strategy": task.strategy,
+            "page_load": self._is_page_load(task),
+            "task_id": task.id,
+            **q.evidence(),
+        }
+        q.risk_hits.append(time.monotonic())
+        self.db.save_risk_event(ev)
+        log.warning("risk event recorded", **{k: v for k, v in ev.items() if k not in ("message", "actions_60m")})
+        return ev
 
     def resume(self, platform: str) -> None:
         """Clear a rate-limit / captcha pause after the user dealt with it in the browser."""
@@ -275,6 +362,7 @@ class TaskManager:
         task.touch()
         q.running = task
         q.last_dispatch = time.monotonic()
+        q.note_dispatch(task.action, self._is_page_load(task))
         self.db.save_task(task)
         log.info("task dispatched", task_id=task.id, platform=task.platform, action=task.action)
         started = time.monotonic()
@@ -299,9 +387,17 @@ class TaskManager:
             except Exception as e:  # noqa: BLE001
                 raise SocialLensError(ErrorCode.PARSE_ERROR, f"parse failed: {e!r}", {"raw": raw})
             self._finish(task, TaskStatus.DONE, result=result)
+            if task.platform != "_system":
+                self._unreached.clear()  # a page answered: Chrome is fine
             log.info("task done", task_id=task.id, elapsed_ms=int((time.monotonic() - started) * 1000))
         except SocialLensError as e:
+            if e.code == ErrorCode.TIMEOUT and task.platform != "_system" and task.id not in self.hub.page_reached:
+                self._unreached.append({"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "task_id": task.id, "platform": task.platform, "action": task.action})
+                del self._unreached[:-20]
+                if len(self._unreached) >= STUCK_MIN_TIMEOUTS:
+                    log.warning("page tasks time out without their tab answering; Chrome may be stuck", count=len(self._unreached), platforms=sorted({u["platform"] for u in self._unreached}))
             if e.code in (ErrorCode.RATE_LIMITED, ErrorCode.CAPTCHA_REQUIRED):
+                self.record_risk(task, q, e)
                 q.paused_until = time.monotonic() + self.pause_on_rate_limit_s
                 log.warning("platform queue paused", platform=task.platform, reason=e.code, seconds=self.pause_on_rate_limit_s)
             self._finish(task, TaskStatus.FAILED, error=e.to_dict())

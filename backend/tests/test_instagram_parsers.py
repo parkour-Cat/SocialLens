@@ -80,3 +80,11 @@ def test_entry_urls():
     assert b["url"] == "https://www.instagram.com/natgeo/" and b["page_params"]["id"] == "natgeo"
     b = a.build_params("search_posts", {"keyword": "cat"})
     assert b["url"] == "https://www.instagram.com/explore/search/keyword/?q=cat"
+
+
+def test_feed_from_preload_block():
+    """Since 2026-09 the first feed page is a server-rendered Relay block, not a GraphQL capture."""
+    out = ip.parse_get_feed(load("get_feed_ssr"))
+    assert len(out["items"]) >= 3 and out["cursor"]
+    p = out["items"][0]
+    assert p["platform"] == "instagram" and p["id"] and p["author"]["name"] and p["metrics"]["likes"] > 0

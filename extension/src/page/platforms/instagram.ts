@@ -33,7 +33,15 @@ async function ssrBlock(needle: string, waitMs = 12_000): Promise<string | null>
   }
 }
 
-const getFeed: PageAction = (p, ctx) => firstOrMore(p, ctx, FEED);
+// Home feed: since 2026-09 the first timeline page is server-rendered into a Relay preload block
+// (the GraphQL timeline query only fires for later pages), so read the block first and fall back
+// to a capture; scrolling still pages through the query.
+const getFeed: PageAction = async (p, ctx) => {
+  if (p.more) return more(ctx, FEED);
+  const text = await ssrBlock("xdt_api__v1__feed__timeline__connection", 8_000);
+  if (text) return { ssr: true, text, href: location.href };
+  return firstOrMore(p, ctx, FEED);
+};
 const getUser: PageAction = (p, ctx) => ctx.waitCapture(USER, since(p), 20_000);
 const getUserPosts: PageAction = (p, ctx) => firstOrMore(p, ctx, USER_POSTS);
 // Explore: the first grid is server-rendered (PolarisQueryPreloaderCache block with sectional_items);

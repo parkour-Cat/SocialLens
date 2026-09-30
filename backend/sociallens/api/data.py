@@ -21,7 +21,7 @@ def _adapter(request: Request, platform: str):
     return adapter
 
 
-async def _run(request: Request, platform: str, action: str, params: dict[str, Any], kind: str | None = None):
+async def _run(request: Request, platform: str, action: str, params: dict[str, Any], kind: str | None = None, source: str = "api"):
     _adapter(request, platform)
     st = state(request)
     params = {k: v for k, v in params.items() if v is not None}
@@ -37,6 +37,8 @@ async def _run(request: Request, platform: str, action: str, params: dict[str, A
         extra["cursor"] = result.get("cursor")
         if kind:
             st.db.upsert_items(kind, platform, result["items"])
+            if result["items"]:
+                extra["query_id"] = st.db.save_query(platform, action, params, kind, result["items"], source=source, task_id=task.id, first_page=not params.get("cursor"))
         data: Any = {"items": result["items"], "total": result.get("total")}
         if result.get("kind"):
             data["kind"] = result["kind"]  # "posts" | "topics" (trending lists)
@@ -94,7 +96,8 @@ async def search_all(
     async def one(pid: str) -> dict[str, Any]:
         entry: dict[str, Any] = {"platform": pid, "items": [], "total": None, "cursor": None, "task_id": None, "error": None}
         try:
-            r = await _run(request, pid, action, {"keyword": keyword}, kind=kind)
+            state(request).tasks.note_context(pid, "multi_search")
+            r = await _run(request, pid, action, {"keyword": keyword}, kind=kind, source="multi_search")
             entry.update(items=r["data"]["items"], total=r["data"].get("total"), cursor=r.get("cursor"), task_id=r.get("task_id"))
         except SocialLensError as e:
             entry["error"] = e.to_dict()

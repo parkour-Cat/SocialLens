@@ -18,6 +18,7 @@ from .api.deps import fail
 from .app_state import AppState
 from .collect import CollectManager
 from .download import DownloadManager
+from .health import HealthManager
 from .config import Settings, get_settings
 from .logging_setup import get_logger, setup_logging
 from .models.errors import ErrorCode, SocialLensError
@@ -43,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     tasks = TaskManager(hub, registry, db, settings.task_timeout_s, settings.pause_on_rate_limit_s)
     downloads = DownloadManager(settings.downloads_dir, registry, tasks, proxy=settings.download_proxy)
     collects = CollectManager(registry, tasks, db)
+    health_mgr = HealthManager(registry, tasks, hub, db, settings.health_interval_min)
 
     async def on_capture(msg: dict[str, Any]) -> None:
         platform = msg.get("platform") or "unknown"
@@ -55,6 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await tasks.start()
+        await health_mgr.start()
         log.info(
             "sociallens backend started",
             version=__version__,
@@ -69,11 +72,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
+            await health_mgr.stop()
             await tasks.stop()
             db.close()
 
     app = FastAPI(title="SocialLens", version=__version__, lifespan=lifespan)
-    app.state.sl = AppState(settings, token, registry, db, raw, hub, tasks, downloads, collects)
+    app.state.sl = AppState(settings, token, registry, db, raw, hub, tasks, downloads, collects, health_mgr)
 
     @app.exception_handler(SocialLensError)
     async def _sl_error(_: Request, exc: SocialLensError):

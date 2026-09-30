@@ -33,7 +33,7 @@
 ### get_feed
 
 - 触发方式：打开 `https://www.instagram.com/`，首页时间线由站点请求；滚动续页。
-- 平台接口：`POST /graphql/query`（PolarisFeedTimelineRootV2Query）→ `data.xdt_api__v1__feed__timeline__connection{edges[{node{media}}],page_info}`。一页里混着推荐单元，帖子可能只有几条。
+- 平台接口：`POST /graphql/query`（PolarisFeedTimelineRootV2Query）→ `data.xdt_api__v1__feed__timeline__connection{edges[{node{media}}],page_info}`。一页里混着推荐单元，帖子可能只有几条。2026-09-29 起首页首屏不再发这个请求，数据在 `<script type="application/json">` 的 Relay 预加载块里（约 230KB，含同一个 connection 字段），页面动作先读块再退回捕获，滚动续页仍是 GraphQL；样本 `get_feed_ssr.json`（健康检查发现的第一个站点变更）。
 - 样本文件：`get_feed.json`
 
 ### get_user / get_user_posts

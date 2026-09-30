@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     task_timeout_s: float = 30.0
     default_rate_interval_s: float = 2.0
     pause_on_rate_limit_s: float = 300.0
+    # Scheduled platform health check (one cheap probe per platform); 0 disables the schedule,
+    # POST /health/check still works.
+    health_interval_min: float = 360.0
 
     # Extension link. The extension's ID is fixed by the `key` in extension/manifest.json, so
     # the WebSocket Origin header (set by the browser, not forgeable by web pages) identifies it.

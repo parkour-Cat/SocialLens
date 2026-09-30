@@ -180,6 +180,9 @@
   .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.25); z-index: 19; display: none; }
   .scrim.open { display: block; }
   #msg { position: fixed; bottom: 16px; right: 16px; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 6px; font-size: 13px; display: none; max-width: 60vw; z-index: 30; }
+  .healthbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--ink-3); }
+  .healthbar .btn { margin-left: auto; padding: 2px 10px; font-size: 12px; }
+  .healthbar .err { color: var(--bad); }
   .alerts { display: grid; gap: 8px; }
   .alerts:empty { display: none; }
   .alert { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
@@ -232,6 +235,7 @@
     <button class="nav on" data-page="overview">概览</button>
     <button class="nav" data-page="query">查询</button>
     <button class="nav" data-page="multi">多平台搜索</button>
+    <button class="nav" data-page="history">历史</button>
     <button class="nav" data-page="collect">连续拉取 <span class="cnt" id="n-collect"></span></button>
     <button class="nav" data-page="downloads">下载 <span class="cnt" id="n-downloads"></span></button>
     <button class="nav" data-page="tasks">任务</button>
@@ -252,11 +256,13 @@
 
     <section class="page on" id="page-overview">
       <div class="alerts" id="alerts"></div>
+      <div class="healthbar" id="healthbar"></div>
       <div class="tiles" id="tiles"></div>
       <div class="cols">
         <div class="panel"><div class="ph">最近任务 <span>最近 20 条，15 秒刷新</span></div><div id="recent"></div></div>
         <div class="panel"><div class="ph">下载 <span id="dl-sub"></span></div><div id="dl-recent"></div></div>
       </div>
+      <div class="panel" style="margin-top:16px"><div class="ph">风控事件 <span id="risk-sub" title="每次遇到验证码或限流时记录之前 10 / 60 分钟的页面加载、任务和调用来源，只记录不干预，用来摸各站的真实阈值。">只记录，不干预</span></div><div id="risk-recent"></div></div>
     </section>
 
     <section class="page" id="page-query">
@@ -295,6 +301,14 @@
       </div>
     </section>
 
+    <section class="page" id="page-history">
+      <div class="panel">
+        <div class="ph">查询历史 <span>每次列表查询都记下返回了哪些条目；指标每次变化存一份快照</span></div>
+        <div class="toolbar"><select id="h-platform" class="field"></select><input id="h-q" class="field" placeholder="关键词 / id" style="flex:1"><button class="btn" id="h-refresh">刷新</button></div>
+        <div id="h-list"></div>
+      </div>
+    </section>
+
     <section class="page" id="page-collect">
       <div class="panel"><div class="ph">连续拉取任务 <span>每 2 秒刷新进行中的</span><button class="btn ghost" onclick="loadCollects()">刷新</button></div><div id="collect-list"></div></div>
     </section>
@@ -315,6 +329,10 @@
     </section>
 
     <section class="page" id="page-api">
+      <div class="panel" style="margin-bottom:16px">
+        <div class="ph">已知问题 <span>已知不能用的和为什么；调试一个平台前先看这里</span></div>
+        <div id="issues-list"></div>
+      </div>
       <div class="panel">
         <div class="ph">各平台能用什么 <span>打勾的是有真实样本和测试、在真浏览器里验证过的；"待验证"是代码已完成但还没跑通；空的是平台没有。鼠标放在平台图标上看该平台的说明</span></div>
         <div class="tablewrap" style="overflow:visible"><table class="matrix" id="api-matrix"></table></div>
@@ -385,6 +403,11 @@ const EN = {
   "综合": "Relevance", "播放": "Views", "最新": "Newest", "热门": "Hot", "时间": "Time", "相关": "Relevant", "最高": "Top", "最佳": "Best", "回答": "Answers", "文章": "Articles",
   "系统": "System", "的短链接暂时不能直接解析，请打开后复制完整地址": " short links cannot be resolved here yet; open it and copy the full address",
   "扩展已连接": "extension connected", "扩展未连接": "extension not connected", "后端不可达": "backend unreachable", "扩展没有连上后端：在 chrome://extensions 加载 extension/dist，或点扩展图标里的": "The extension is not connected: load extension/dist at chrome://extensions, or use", "重连": "Reconnect", "恢复": "Resume",
+  "风控事件": "Risk-control hits", "只记录，不干预": "recorded, nothing adapts", "每次遇到验证码或限流时记录之前 10 / 60 分钟的页面加载、任务和调用来源，只记录不干预，用来摸各站的真实阈值。": "Each captcha or rate limit is logged with the page loads, tasks and callers of the previous 10 / 60 minutes; nothing adapts to it. That is how the real thresholds of each site get learned.", "还没有风控事件": "No risk-control hits yet", "健康检查": "health check", "多平台搜索中": "multi-search", "连续拉取中": "collecting", "健康检查中": "health check", "上次命中": "previous hit",
+  "历史": "History", "查询历史": "Query history", "每次列表查询都记下返回了哪些条目；指标每次变化存一份快照": "every list query records the items it returned; metrics are snapshotted on each change", "关键词 / id": "keyword / id", "还没有查询记录": "No queries yet", "打开结果": "Open results", "当时": "then", "现在": "now", "指标变化": "Metric history", "只看过一次，还没有变化记录": "Seen once; no changes recorded yet",
+  "已知问题": "Known issues", "已知不能用的和为什么；调试一个平台前先看这里": "what is known not to work and why; read before debugging a platform", "未解决": "open", "待验证": "unverified", "站点限制": "site limit", "有意为之": "by design", "扩展": "extension", "通用": "general", "自": "since",
+  "Chrome 可能卡住了": "Chrome looks stuck", "完全退出 Chrome（包括托盘）再重开。": "Quit Chrome completely (tray too) and reopen it.", "多平台搜索": "multi-search", "连续拉取": "collect", "接口调用": "API call",
+  "平台探测": "Probes", "现在检查": "Check now", "检查中…": "Checking…", "还没检查过": "never run", "异常": "Broken", "受阻": "Blocked", "探测失败": "Probe failed", "探测正常": "probe ok", "探测异常": "probe failed", "探测受阻": "probe blocked", "探测": "probe", "每个平台各跑一次最便宜的读取（热榜或首页流），每个平台算一次页面加载。": "Runs each platform's cheapest read (trending or home feed); one page load per platform.",
   "未登录": "Not signed in", "配额等待": "Waiting for budget", "执行中": "Running", "仅后台": "Backstage only", "空闲": "Idle", "去登录 ↗": "Sign in ↗", "分钟": "min", "还没有任务": "No tasks yet", "还没有下载": "No downloads yet", "已恢复队列": "Queue resumed", "打开页面": "Open page", "页": "pages", "续页": "next page", "完成": "Done", "失败": "Failed", "排队": "Queued", "已取消": "Cancelled",
   "用户 id / @handle / 用户名": "User id / @handle / username", "帖子 id（BV 号、笔记 id、视频 id、推文 id）": "Post id (BV id, note id, video id, tweet id)", "请求中，页面级动作要开标签页，可能要十几秒…": "Working… page actions open a tab and can take ten seconds or more",
   "，可翻页": ", more pages", "，没有更多": ", no more", "达到条数上限": "reached the item limit", "已到列表末尾": "end of list", "达到页数上限": "reached the page limit", "中途出错，保留已拿到的": "stopped on an error; pages fetched so far are kept",
@@ -415,6 +438,20 @@ const EN_RX = [
   [/^(\d+)\/(\d+) 个文件 · (.+)$/, "$1/$2 files · $3"],
   [/^([\d.]+) 秒 · 任务 (\w+)$/, "$1 s · task $2"],
   [/^([\d.]+) 秒$/, "$1 s"],
+  [/^上次 (.+)$/, "last $1"],
+  [/^自 (.+) 起 (\d+) 个页面任务的标签页始终没有加载（(.+)），扩展后台却在线。$/, (_, t, n, p) => `Since ${t}, ${n} page tasks timed out without their tab ever answering (${p}) while the extension stayed online.`],
+  [/^(\d+) 条 · 第一页$/, "$1 items · first page"],
+  [/^历史 #(\d+)$/, "history #$1"],
+  [/^页面 (\S+) · 任务 (\S+)$/, "pages $1 · tasks $2"],
+  [/^最小间隔 ([\d.]+) 秒$/, "min gap $1 s"],
+  [/^上次命中 (\d+) 分钟前$/, "previous hit $1 min ago"],
+  [/^最近 (\d+) 次$/, "last $1"],
+  [/^(\d+) 正常$/, "$1 ok"],
+  [/^(\d+) 异常$/, "$1 broken"],
+  [/^(\d+) 受阻$/, "$1 blocked"],
+  [/^每 ([\d.]+) 小时$/, "every $1 h"],
+  [/^从 (.+) 起$/, "since $1"],
+  [/^探测(正常|异常|受阻) (.+)$/, (_, st, t) => `probe ${st === "正常" ? "ok" : st === "异常" ? "failed" : "blocked"} ${t}`],
   [/^(\d+) 条(?:，共约 ([^，]+))?(，可翻页|，没有更多)?$/, (_, n, t, more) => `${n} items${t ? ` of ~${t}` : ""}${more === "，可翻页" ? ", more pages" : more === "，没有更多" ? ", no more" : ""}`],
   [/^连续拉取中：(\d+) 条，(\d+) 页，([\d.]+) 秒$/, "Collecting: $1 items, $2 pages, $3 s"],
   [/^(\d+) 条 \/ (\d+) 页 · ([\d.]+) 秒$/, "$1 items / $2 pages · $3 s"],
@@ -490,7 +527,9 @@ const state = { multi: new Set(), platforms: [], status: null, page: "overview",
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmtN = (n) => n == null ? "–" : ZH ? (n >= 1e8 ? (n / 1e8).toFixed(1) + "亿" : n >= 1e4 ? (n / 1e4).toFixed(1) + "万" : String(n)) : (n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "K" : String(n));
-const fmtT = (t) => t ? String(t).replace("T", " ").slice(5, 16) : "–";
+// Times come from the backend in UTC ISO; show them in the browser's local time (platform publish
+// times that do not parse fall back to the raw text).
+const fmtT = (t) => { if (!t) return "–"; const d = new Date(String(t)); if (Number.isNaN(d.getTime())) return String(t).replace("T", " ").slice(5, 16); const p = (n) => String(n).padStart(2, "0"); return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const fmtB = (b) => b == null ? "–" : b >= 1 << 30 ? (b / (1 << 30)).toFixed(2) + " GB" : b >= 1 << 20 ? (b / (1 << 20)).toFixed(1) + " MB" : b >= 1024 ? (b / 1024).toFixed(0) + " KB" : b + " B";
 let msgTimer;
 function toast(text, bad) { const m = $("msg"); m.textContent = text; m.style.background = bad ? "var(--bad)" : "var(--ink)"; m.style.color = bad ? "#fff" : "var(--bg)"; m.style.display = "block"; clearTimeout(msgTimer); msgTimer = setTimeout(() => (m.style.display = "none"), bad ? 6000 : 2500); }
@@ -507,7 +546,7 @@ function itemKind(it) { if (!it) return "posts"; if (it.type === "topic") return
 function saveBlob(name, text, type) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
 const J = (v) => esc(JSON.stringify(v ?? ""));
 
-const TITLES = { overview: "概览", query: "查询", multi: "多平台搜索", collect: "连续拉取", downloads: "下载", tasks: "任务", cache: "缓存", api: "接口" };
+const TITLES = { overview: "概览", query: "查询", multi: "多平台搜索", history: "历史", collect: "连续拉取", downloads: "下载", tasks: "任务", cache: "缓存", api: "接口" };
 document.querySelectorAll(".nav").forEach((b) => b.addEventListener("click", () => showPage(b.dataset.page)));
 function showPage(name) {
   state.page = name;
@@ -515,7 +554,7 @@ function showPage(name) {
   document.querySelectorAll("section.page").forEach((s) => s.classList.toggle("on", s.id === "page-" + name));
   $("page-title").textContent = TITLES[name] || name;
   location.hash = name;
-  ({ overview: loadOverview, collect: loadCollects, downloads: loadDownloads, tasks: loadTasks, cache: loadCache, api: loadApi })[name]?.();
+  ({ overview: loadOverview, history: loadHistory, collect: loadCollects, downloads: loadDownloads, tasks: loadTasks, cache: loadCache, api: loadApi })[name]?.();
 }
 
 $("omni").addEventListener("keydown", async (e) => {
@@ -595,9 +634,78 @@ async function loadStatus() {
     return st;
   } catch (e) { $("side-conn").innerHTML = `<span class="dot bad"></span> 后端不可达`; throw e; }
 }
+function renderHealthBar(h) {
+  const el = $("healthbar"); if (!h) { el.innerHTML = ""; return; }
+  const rows = Object.values(h.platforms).filter(Boolean);
+  const n = (st) => rows.filter((r) => r.state === st).length;
+  const last = rows.length ? rows.map((r) => r.checked_at).sort().pop() : null;
+  const running = !!h.running;
+  el.innerHTML = `<span title="每个平台各跑一次最便宜的读取（热榜或首页流），每个平台算一次页面加载。">平台探测</span> · <span>${last ? `上次 ${esc(fmtT(last))}` : "还没检查过"}</span>${rows.length ? ` · <span>${n("ok")} 正常</span> · <span class="${n("broken") ? "err" : ""}">${n("broken")} 异常</span> · <span>${n("blocked")} 受阻</span>` : ""}${h.interval_min ? ` · <span>每 ${Math.round(h.interval_min / 60 * 10) / 10} 小时</span>` : ""}<button class="btn" id="health-run" ${running ? "disabled" : ""} onclick="runHealthCheck()">${running ? "检查中…" : "现在检查"}</button>`;
+  if (running) setTimeout(() => state.page === "overview" && loadOverview(), 3000);
+}
+async function runHealthCheck() {
+  const b = $("health-run"); if (b) { b.disabled = true; b.textContent = "检查中…"; }
+  try { await api("/health/check", { method: "POST", body: JSON.stringify({ wait: false }) }); } catch (e) { toast(e.message, true); }
+  loadOverview();
+}
+// ---- history: past queries and metric snapshots ------------------------------------------------
+const SOURCE_NAME = { api: "接口调用", multi_search: "多平台搜索", collect: "连续拉取" };
+async function loadHistory() {
+  if (!state.platforms.length) { setTimeout(loadHistory, 300); return; } // opened by hash before /platforms answered
+  if (!$("h-platform").options.length) {
+    $("h-platform").innerHTML = `<option value="">全部平台</option>` + state.platforms.map((p) => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+    $("h-platform").addEventListener("change", loadHistory); $("h-refresh").addEventListener("click", loadHistory);
+    $("h-q").addEventListener("keydown", (e) => e.key === "Enter" && loadHistory());
+  }
+  const q = new URLSearchParams({ limit: "200" }); if ($("h-platform").value) q.set("platform", $("h-platform").value); if ($("h-q").value.trim()) q.set("q", $("h-q").value.trim());
+  const rows = (await api("/queries?" + q)).data;
+  $("h-list").innerHTML = rows.length ? rows.map((r) => `<div class="row"><span class="t">${esc(fmtT(r.at))}</span><span>${logo(r.platform, true)} ${esc(pname(r.platform))} · ${esc(actionName(r.action))}${r.key ? ` · <span class="mono">${esc(r.key)}</span>` : ""} <span class="sub"><span>${r.count} 条 · 第一页</span> · <span>${esc(SOURCE_NAME[r.source] || r.source)}</span></span></span><button class="btn ghost" onclick="openHistory(${r.id})">打开结果</button></div>`).join("") : `<div class="empty">还没有查询记录</div>`;
+}
+/** Show a past query's items on the query page (metrics_then next to today's numbers in the drawer). */
+async function openHistory(id) {
+  const q = (await api(`/queries/${id}`)).data;
+  const form = { platform: q.platform, action: q.action, keyword: q.params.keyword || "", id: q.params.post_id || q.params.id || q.params.user_id || "", cid: q.params.comment_id || "", xsec: q.params.xsec_token || "", mode: "page", limit: $("q-limit").value };
+  views[q.platform] = { results: q.items, kind: q.kind, cursor: null, ctx: { platform: q.platform, action: q.action, key: q.key, source: `历史 #${q.id}`, form, at: Date.parse(q.at) }, lastRaw: q, count: `${q.items.length} 条`, info: "" };
+  showPage("query");
+  if (state.platform === q.platform) applyView(views[q.platform]); else selectPlatform(q.platform);
+  if ([...$("q-action").options].some((o) => o.value === q.action)) $("q-action").value = q.action;
+  $("q-keyword").value = form.keyword; $("q-id").value = form.id; $("q-cid").value = form.cid; $("q-xsec").value = form.xsec; setMode("page"); syncForm();
+}
+const METRIC_NAMES = { likes: "赞", comments: "评论", shares: "分享", collects: "收藏", views: "播放", followers: "粉丝", following: "关注", posts: "作品" };
+async function drawerHistory(it) {
+  const kind = itemKind(it); if (!["posts", "users"].includes(kind) || !it.platform) return;
+  try {
+    const h = (await api(`/items/${kind}/${encodeURIComponent(it.platform)}/${encodeURIComponent(it.id)}/history`)).data.snapshots;
+    if (state.selected !== it) return;
+    const keys = Object.keys(METRIC_NAMES).filter((k) => h.some((s) => s.metrics[k] != null));
+    const body = h.length > 1 && keys.length
+      ? `<table><thead><tr><th>时间</th>${keys.map((k) => `<th class="num">${METRIC_NAMES[k]}</th>`).join("")}</tr></thead><tbody>${h.slice(-12).map((s) => `<tr><td class="sub">${esc(fmtT(s.at))}</td>${keys.map((k) => `<td class="num">${fmtN(s.metrics[k])}</td>`).join("")}</tr>`).join("")}</tbody></table>`
+      : `<div class="sub">只看过一次，还没有变化记录</div>`;
+    const then = it.metrics_then;
+    const delta = then && it.metrics ? keys.filter((k) => then[k] != null && it.metrics[k] != null && then[k] !== it.metrics[k]).map((k) => `${METRIC_NAMES[k]} ${fmtN(then[k])} → ${fmtN(it.metrics[k])}`).join(" · ") : "";
+    $("dr-body").insertAdjacentHTML("beforeend", `<details open><summary>指标变化</summary>${delta ? `<div class="sub" style="margin:6px 0"><span>当时</span> → <span>现在</span>：${esc(delta)}</div>` : ""}<div class="tablewrap">${body}</div></details>`);
+  } catch {}
+}
+const STATUS_NAME = { open: ["bad", "未解决"], unverified: ["warn", "待验证"], limit: ["neutral", "站点限制"], by_design: ["neutral", "有意为之"] };
+async function loadIssues() {
+  if (!state.platforms.length) { setTimeout(loadIssues, 300); return; }
+  try {
+    const list = (await api("/known-issues")).data;
+    $("issues-list").innerHTML = list.map((i) => { const st = STATUS_NAME[i.status] || ["neutral", i.status]; const who = i.platform === "extension" ? "扩展" : i.platform === "general" ? "通用" : pname(i.platform); return `<div class="row" style="align-items:flex-start"><span class="t">${esc(i.since)}</span><span>${i.platform === "extension" || i.platform === "general" ? `<b>${esc(who)}</b>` : `${logo(i.platform, true)} ${esc(who)}`} · <b>${esc(ZH ? i.title : i.title_en)}</b><br><span class="sub">${esc(ZH ? i.detail : i.detail_en)}</span></span><span class="pill ${st[0]}">${esc(st[1])}</span></div>`; }).join("");
+  } catch (e) { $("issues-list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
 async function loadOverview() {
   let st; try { st = await loadStatus(); } catch (e) { $("tiles").innerHTML = `<div class="empty">后端不可达：${esc(e.message)}</div>`; return; }
   const alerts = [];
+  let health = null; try { health = (await api("/health/platforms")).data; } catch {}
+  const hp = health?.platforms || {};
+  for (const p of state.platforms) {
+    const h = hp[p.id]; if (!h || h.state !== "broken") continue;
+    alerts.push(`<div class="alert bad"><span class="dot bad"></span>${logo(p.id, true)} ${esc(p.name)} <span>探测失败</span>：<span class="mono">${esc(h.action || "")} · ${esc(h.code || "")}${h.message ? ": " + esc(h.message.slice(0, 120)) : ""}</span>${h.broken_since ? `（<span>从 ${esc(fmtT(h.broken_since))} 起</span>）` : ""}</div>`);
+  }
+  renderHealthBar(health);
+  const stuck = st.diagnosis?.chrome_stuck;
+  if (stuck) alerts.push(`<div class="alert bad"><span class="dot bad"></span><b>Chrome 可能卡住了</b>：<span>自 ${esc(fmtT(stuck.since))} 起 ${stuck.tasks} 个页面任务的标签页始终没有加载（${stuck.platforms.map(pname).map(esc).join("、")}），扩展后台却在线。</span> <span>完全退出 Chrome（包括托盘）再重开。</span></div>`);
   if (!st.extension.online) alerts.push(`<div class="alert bad"><span class="dot bad"></span>扩展没有连上后端：在 chrome://extensions 加载 extension/dist，或点扩展图标里的"重连"。</div>`);
   for (const p of state.platforms) {
     const q = st.queues?.[p.id] || {};
@@ -607,8 +715,9 @@ async function loadOverview() {
   $("tiles").innerHTML = state.platforms.map((p) => {
     const s = st.platforms?.[p.id] || {}; const q = st.queues?.[p.id] || {}; const budget = p.rate_limit?.page_loads || 0; const used = q.page_loads_in_window || 0;
     const ratio = budget ? used / budget : 0;
-    const pill = s.logged_in === false ? `<span class="pill bad">未登录</span>` : q.paused_for_s > 0 ? `<span class="pill warn">已暂停 ${Math.ceil(q.paused_for_s / 60)}m</span>` : q.budget_wait_s > 0 ? `<span class="pill warn">配额等待</span>` : q.running ? `<span class="pill ok">执行中</span>` : p.id === "weixin_channels" ? `<span class="pill neutral">仅后台</span>` : `<span class="pill neutral">空闲</span>`;
-    const right = s.logged_in === false ? `<a href="${esc(p.login_url || p.home_url)}" target="_blank" onclick="event.stopPropagation()">去登录 ↗</a>` : `${(s.tabs || []).length ? (s.tabs || []).length + " 个标签页" : ""}`;
+    const h = hp[p.id];
+    const pill = s.logged_in === false ? `<span class="pill bad">未登录</span>` : h?.state === "broken" ? `<span class="pill bad">异常</span>` : q.paused_for_s > 0 ? `<span class="pill warn">已暂停 ${Math.ceil(q.paused_for_s / 60)}m</span>` : q.budget_wait_s > 0 ? `<span class="pill warn">配额等待</span>` : q.running ? `<span class="pill ok">执行中</span>` : p.id === "weixin_channels" ? `<span class="pill neutral">仅后台</span>` : `<span class="pill neutral">空闲</span>`;
+    const right = s.logged_in === false ? `<a href="${esc(p.login_url || p.home_url)}" target="_blank" onclick="event.stopPropagation()">去登录 ↗</a>` : h?.checked_at ? `<span class="${h.state === "broken" ? "err" : ""}" title="${esc(h.message || h.action || "")}">探测${h.state === "ok" ? "正常" : h.state === "broken" ? "异常" : "受阻"} ${esc(fmtT(h.checked_at).slice(6))}</span>` : `${(s.tabs || []).length ? (s.tabs || []).length + " 个标签页" : ""}`;
     return `<div class="tile" onclick="quickPlatform('${p.id}')"><div class="n">${logo(p.id)}${esc(p.name)}${pill}</div><div class="meter"><i class="${ratio >= 0.9 ? "bad" : ratio >= 0.6 ? "warn" : ""}" style="width:${Math.min(100, ratio * 100)}%"></i></div><div class="m"><span>页面 ${used}/${budget || "∞"} · ${Math.round((p.rate_limit?.window_s || 600) / 60)} 分钟</span><span>${right}</span></div></div>`;
   }).join("");
   const tasks = (await api("/tasks?limit=60")).data.filter((t) => t.platform !== "_system" && !isDebugTask(t)).slice(0, 20);
@@ -618,6 +727,13 @@ async function loadOverview() {
   $("dl-sub").textContent = active.length ? `${active.length} 个进行中` : `最近 ${dls.length} 个`;
   $("dl-recent").innerHTML = dls.length ? dls.slice(0, 5).map((t) => dlRow(t)).join("") : `<div class="empty">还没有下载</div>`;
   $("n-downloads").textContent = active.length || "";
+  try {
+    const risk = (await api("/risk/events?limit=10")).data;
+    const evs = risk.events || [];
+    const ctxName = { multi_search: "多平台搜索中", health: "健康检查中", collect: "连续拉取中" };
+    $("risk-sub").textContent = evs.length ? `最近 ${evs.length} 次` : "只记录，不干预";
+    $("risk-recent").innerHTML = evs.length ? evs.map((e) => `<div class="row"><span class="t">${esc(fmtT(e.at))}</span><span>${logo(e.platform, true)} ${esc(pname(e.platform))} · <span class="mono">${esc(e.code)}</span> · ${esc(actionName(e.action))} <span class="sub"><span>页面 ${e.page_loads_10m}/10min,${e.page_loads_60m}/60min · 任务 ${e.tasks_10m}/10min,${e.tasks_60m}/60min</span>${e.min_gap_s_10m != null ? ` · <span>最小间隔 ${e.min_gap_s_10m} 秒</span>` : ""}${(e.contexts_10m || []).length ? ` · ${e.contexts_10m.map((c) => `<span>${esc(ctxName[c] || c)}</span>`).join(" ")}` : ""}${e.since_last_hit_s != null ? ` · <span>上次命中 ${Math.round(e.since_last_hit_s / 60)} 分钟前</span>` : ""}</span></span><span class="pill bad" title="${esc(e.message || "")}">${esc(e.code === "captcha_required" ? "验证码" : "限流")}</span></div>`).join("") : `<div class="empty">还没有风控事件</div>`;
+  } catch {}
   const cols = (await api("/collects?limit=20")).data.filter((t) => t.status === "running" || t.status === "queued");
   $("n-collect").textContent = cols.length || "";
 }
@@ -867,6 +983,7 @@ function openDrawer(it) {
   if (actions.length) parts.push(`<div style="display:flex;gap:8px;flex-wrap:wrap">${actions.join("")}</div>`);
   parts.push(`<details><summary>原始 JSON</summary><pre>${esc(JSON.stringify(it, null, 2))}</pre></details>`);
   $("dr-body").innerHTML = parts.join(""); $("drawer").classList.add("open"); $("scrim").classList.add("open");
+  void drawerHistory(it);
 }
 function closeDrawer() { $("drawer").classList.remove("open"); $("scrim").classList.remove("open"); }
 document.addEventListener("keydown", (e) => e.key === "Escape" && closeDrawer());
@@ -1075,6 +1192,7 @@ function renderMatrix() {
   $("api-matrix").innerHTML = `<thead>${head}</thead><tbody>${rows.join("")}</tbody>`;
 }
 async function loadApi() {
+  void loadIssues();
   try {
     if (!apiDoc) apiDoc = await (await fetch("/openapi.json")).json();
     if (!mcpDoc) mcpDoc = (await api("/mcp/tools")).data;

@@ -83,6 +83,7 @@ class CollectManager:
             task.status = TaskStatus.RUNNING
             self.tasks.save(task)
             while True:
+                self.tasks.note_context(platform, "collect")
                 page = await self.tasks.run(platform, action, {**params, **({"cursor": cursor} if cursor else {})})
                 data = page.result if isinstance(page.result, dict) else {}
                 r["pages"] += 1
@@ -110,6 +111,8 @@ class CollectManager:
                 if r["stopped_by"]:
                     break
             self._cache(platform, r)
+            if r["kind"] and r["items"]:
+                r["query_id"] = self.db.save_query(platform, action, params, r["kind"], r["items"], source="collect", task_id=task.id)
             self.tasks.finish(task, TaskStatus.DONE, result=r)
             log.info("collect finished", task_id=task.id, platform=platform, action=action, count=r["count"], pages=r["pages"], stopped_by=r["stopped_by"])
         except asyncio.CancelledError:

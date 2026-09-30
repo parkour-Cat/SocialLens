@@ -13,6 +13,7 @@ import {
   type TaskSpec,
 } from "../shared/messages";
 import { PageError } from "./errors";
+import { makeMatcher } from "./matcher";
 import { currentPagePlatform, platformAction } from "./platforms";
 
 // Re-injection after an extension reload must not install the same build twice: the whole
@@ -339,44 +340,6 @@ async function actionFetch(p: Params): Promise<unknown> {
   const resHeaders: Record<string, string> = {};
   res.headers.forEach((v, k) => (resHeaders[k] = v));
   return { status: res.status, url: res.url, headers: resHeaders, ...parsed };
-}
-
-/** `/regex/flags` is a regular expression; anything else is a plain substring (paths like
- *  `/api/x/y` are substrings, not regexes, because their tail is not a valid flag list). */
-function textMatcher(pattern: string): (s: string) => boolean {
-  const m = /^\/(.+)\/([gimsuy]*)$/.exec(pattern);
-  if (m) {
-    try {
-      const re = new RegExp(m[1], m[2]);
-      return (s) => re.test(s);
-    } catch {
-      /* fall through to substring */
-    }
-  }
-  return (s) => s.includes(pattern);
-}
-
-/** "url-pattern" or "url-pattern @@ request-body-pattern" (GraphQL: match the operationName). */
-// Response text, stringified once per capture (Instagram answers every GraphQL query at the same
-// URL, so captures are told apart by what the response contains).
-const responseText = new WeakMap<Capture, string>();
-function textOfCapture(c: Capture): string {
-  let t = responseText.get(c);
-  if (t == null) {
-    t = typeof c.body === "string" ? c.body : c.body == null ? "" : JSON.stringify(c.body);
-    responseText.set(c, t);
-  }
-  return t;
-}
-
-/** `url`, `url @@ request-body`, or `url ## response-body`; each part a substring or /regex/. */
-function makeMatcher(pattern: string): (c: Capture) => boolean {
-  const [urlAndReq, respPart] = pattern.split(" ## ");
-  const [urlPart, bodyPart] = urlAndReq.split(" @@ ");
-  const urlOk = textMatcher(urlPart.trim());
-  const reqOk = bodyPart ? textMatcher(bodyPart.trim()) : null;
-  const respOk = respPart ? textMatcher(respPart.trim()) : null;
-  return (c) => urlOk(c.url) && (!reqOk || reqOk(c.request_body ?? "")) && (!respOk || respOk(textOfCapture(c)));
 }
 
 async function actionWaitCapture(p: Params, taskTimeoutMs: number): Promise<unknown> {

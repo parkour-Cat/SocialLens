@@ -98,6 +98,7 @@ class ExtensionHub:
     ):
         self._token = token
         self._allowed_origins = allowed_origins or set()
+        self.page_reached: set[str] = set()  # task ids whose tab answered (see TaskManager.diagnosis)
         self._heartbeat_s = heartbeat_s
         self._auth_timeout_s = auth_timeout_s
         self._backend_version = backend_version
@@ -282,6 +283,12 @@ class ExtensionHub:
             if self.capture_handler:
                 await self.capture_handler(msg)
         elif mtype == "log":
+            # "task sent to page" is the proof that a tab loaded and its content script answered;
+            # page-level timeouts without it point at Chrome, not the site (see TaskManager.diagnosis).
+            if msg.get("msg") == "task sent to page" and msg.get("task_id"):
+                if len(self.page_reached) > 2000:
+                    self.page_reached.clear()
+                self.page_reached.add(str(msg["task_id"]).split(":")[0])
             level = str(msg.get("level", "info")).lower()
             fields = {k: v for k, v in msg.items() if k not in ("type", "level", "msg")}
             getattr(log, level if level in ("debug", "info", "warning", "error") else "info")(
