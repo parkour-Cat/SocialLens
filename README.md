@@ -99,7 +99,7 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 
 ## REST 接口
 
-所有响应都是 `{"success": true, "data": ...}` 或 `{"success": false, "error": {"code", "message"}}`。列表类接口返回 `data.items`、`data.total` 和顶层 `cursor`，把 `cursor` 原样传回去取下一页（cursor 绑定一个会话标签页，十分钟内有效）。
+所有响应都是 `{"success": true, "data": ...}` 或 `{"success": false, "error": {"code", "message"}}`。列表类接口返回 `data.items`、`data.total` 和顶层 `cursor`，把 `cursor` 原样传回去取下一页（cursor 绑定一个会话标签页，十分钟内有效；同一平台再发起一次同类查询会顶掉那个页面，旧 cursor 随之失效）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -107,6 +107,7 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 | GET | `/api/v1/platforms` | 已注册平台及其能力 |
 | GET | `/api/v1/resolve?q=` | 识别一条链接 / id 属于哪个平台、哪个对象 |
 | GET | `/api/v1/{platform}/search?keyword=&type=post\|user&cursor=` | 搜索 |
+| GET | `/api/v1/search?keyword=&platforms=a,b,c&type=post\|user` | 多平台同时搜索：各平台并行、各自限速，结果按平台分组，每组自带 cursor 和 error |
 | GET | `/api/v1/{platform}/posts/{id}` | 帖子详情 |
 | GET | `/api/v1/{platform}/posts/{id}/comments?cursor=` | 评论 |
 | GET | `/api/v1/{platform}/posts/{id}/comments/{comment_id}/replies?cursor=` | 评论的回复 |
@@ -152,7 +153,7 @@ claude mcp add sociallens -- uv run --project /path/to/SocialLens/backend social
 }
 ```
 
-tools：`status`、`list_platforms`、`get_capabilities`、`search`、`get_post`、`get_comments`、`get_replies`、`get_user`、`get_user_posts`、`get_feed`、`get_trending`、`collect`、`download`、`list_downloads`、`get_task`、`resume`。后端的错误（`not_logged_in`、`captcha_required`、`cursor_expired` 等）原样作为 tool error 交给模型。
+tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform 传逗号分隔的多个平台即多平台并行搜索）、`get_post`、`get_comments`、`get_replies`、`get_user`、`get_user_posts`、`get_feed`、`get_trending`、`collect`、`download`、`list_downloads`、`get_task`、`resume`。后端的错误（`not_logged_in`、`captcha_required`、`cursor_expired` 等）原样作为 tool error 交给模型。
 
 ## 下载与代理
 

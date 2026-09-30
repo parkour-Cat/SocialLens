@@ -34,13 +34,13 @@
 
 ### search_posts
 
-- 入口：`/search/{keyword}?type=video`，页面加载即请求 `GET /aweme/v1/web/search/item/?keyword=&offset=&count=&cursor=`，响应可超过 1 MB。
+- 入口：`/jingxuan/search/{keyword}?type=video`（2026-09-29 起；站点搜索框现在跳这个路径，老的 `/search/{keyword}` 仍能用但会间歇 502、首页只给 10 条；未登录的浏览器会被从 `/jingxuan/search/` 重定向回 `/search/`，搜索接口不变），页面加载即请求 `GET /aweme/v1/web/search/item/?keyword=&offset=&count=&cursor=`，响应可超过 1 MB。
 - 字段：`data[]{type, aweme_info{aweme_id, desc, create_time, author{sec_uid,uid,nickname,avatar_thumb,follower_count}, statistics{digg_count,comment_count,share_count,collect_count}, video{play_addr{url_list,width,height,data_size}, cover, origin_cover, duration(毫秒), play_addr_265}, text_extra[{hashtag_name}], images[]}}`，`has_more`，`cursor`。
 - 样本：`search_posts.json`、`search_posts_page2.json`。翻页靠滚动。
 
 ### search_users
 
-- 入口：`/search/{keyword}?type=user`，请求 `GET /aweme/v1/web/discover/search/?search_channel=aweme_user_web`。
+- 入口：`/jingxuan/search/{keyword}?type=user`，请求 `GET /aweme/v1/web/discover/search/?search_channel=aweme_user_web`。
 - 字段：`user_list[]{user_info{uid, sec_uid, nickname, unique_id, signature, avatar_thumb, follower_count, total_favorited, custom_verify}}`，`has_more`，`cursor`。
 - 样本：`search_users.json`
 

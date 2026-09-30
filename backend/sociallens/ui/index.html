@@ -113,6 +113,8 @@
   .seg.count input::-webkit-outer-spin-button, .seg.count input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .seg button:disabled { opacity: .4; cursor: default; }
+  .multi { display: grid; gap: 12px; min-width: 0; }
+  .multi .results .toolbar .err { color: var(--bad); }
   .results { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; min-width: 0; }
   .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
   .toolbar .sp { flex: 1; }
@@ -229,6 +231,7 @@
     <div class="brand"><span class="logo"></span>SocialLens</div>
     <button class="nav on" data-page="overview">概览</button>
     <button class="nav" data-page="query">查询</button>
+    <button class="nav" data-page="multi">多平台搜索</button>
     <button class="nav" data-page="collect">连续拉取 <span class="cnt" id="n-collect"></span></button>
     <button class="nav" data-page="downloads">下载 <span class="cnt" id="n-downloads"></span></button>
     <button class="nav" data-page="tasks">任务</button>
@@ -275,6 +278,20 @@
           <div id="q-stale" class="stale" hidden></div>
           <div class="tablewrap" id="q-results"><div class="empty">选平台和动作，或直接在上面粘一条链接。</div></div>
         </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-multi">
+      <div class="bench">
+        <div class="form">
+          <label>关键词<input id="m-keyword" class="field" placeholder="关键词"></label>
+          <label>类型<div class="seg" id="m-type"><button class="on" data-v="post">帖子</button><button data-v="user">用户</button></div></label>
+          <label>平台<span class="chips" id="m-platforms"></span></label>
+          <div style="display:flex;gap:8px"><button class="btn ghost" id="m-all">全选</button><button class="btn ghost" id="m-none">清空</button></div>
+          <button class="btn primary" id="m-run">同时搜索</button>
+          <span class="sub" id="m-info">各平台各自限速和页面配额，一次搜索每个平台只算一次页面加载；某个平台出错不影响其他。</span>
+        </div>
+        <div class="multi" id="m-results"><div class="results"><div class="empty">选几个平台，输入关键词，同时搜。</div></div></div>
       </div>
     </section>
 
@@ -353,7 +370,9 @@ const ZH = LANG === "zh";
 const Z = (zh, en) => (ZH ? zh : en);
 function setLang(l) { try { localStorage.setItem("sl_lang", l); } catch {} location.reload(); }
 const EN = {
-  "SocialLens 控制台": "SocialLens Console", "概览": "Overview", "查询": "Query", "连续拉取": "Collect", "下载": "Download", "任务": "Tasks", "缓存": "Cache", "接口": "API", "连接中…": "Connecting…",
+  "SocialLens 控制台": "SocialLens Console", "概览": "Overview", "查询": "Query", "多平台搜索": "Multi-search", "类型": "Type", "全选": "All", "清空": "None", "同时搜索": "Search all", "同时搜索中…": "Searching…",
+  "各平台各自限速和页面配额，一次搜索每个平台只算一次页面加载；某个平台出错不影响其他。": "Each platform keeps its own rate limit and page budget; one search costs each platform one page load, and one platform failing does not affect the others.",
+  "选几个平台，输入关键词，同时搜。": "Pick a few platforms, type a keyword, search them all at once.", "在查询页翻页 →": "Page on in Query →", "多平台搜索": "Multi-search", "先选至少一个平台": "Pick at least one platform first", "至少填一个关键词": "Type a keyword first", "连续拉取": "Collect", "下载": "Download", "任务": "Tasks", "缓存": "Cache", "接口": "API", "连接中…": "Connecting…",
   "关键词、帖子或用户链接、id，回车直达": "Keyword, post / user link or id — Enter to go", "最近任务": "Recent tasks", "最近 20 条，15 秒刷新": "Last 20, refreshed every 15 s",
   "平台": "Platform", "动作": "Action", "关键词": "Keyword", "帖子 id / 用户 id": "Post id / user id", "评论 id": "Comment id", "小红书链接里的 xsec_token": "xsec_token from the Xiaohongshu link", "排序": "Order", "条数": "Count", "一页": "One page", "连续到": "Up to", "条": "items", "下一页": "Next page", "← 返回": "← Back", "还没有结果": "No results yet", "导出 JSON": "Export JSON", "导出 CSV": "Export CSV",
   "选平台和动作，或直接在上面粘一条链接。": "Pick a platform and an action, or paste a link above.", "连续拉取任务": "Collect tasks", "每 2 秒刷新进行中的": "running ones refresh every 2 s", "刷新": "Refresh", "帖子 id 或链接": "Post id or link", "全部平台": "All platforms", "全部状态": "All statuses", "显示调试动作": "Show debug actions", "加载中…": "Loading…", "加载更多": "Load more",
@@ -395,6 +414,7 @@ const EN_RX = [
   [/^(.*) · 续页$/, "$1 · next page"],
   [/^(\d+)\/(\d+) 个文件 · (.+)$/, "$1/$2 files · $3"],
   [/^([\d.]+) 秒 · 任务 (\w+)$/, "$1 s · task $2"],
+  [/^([\d.]+) 秒$/, "$1 s"],
   [/^(\d+) 条(?:，共约 ([^，]+))?(，可翻页|，没有更多)?$/, (_, n, t, more) => `${n} items${t ? ` of ~${t}` : ""}${more === "，可翻页" ? ", more pages" : more === "，没有更多" ? ", no more" : ""}`],
   [/^连续拉取中：(\d+) 条，(\d+) 页，([\d.]+) 秒$/, "Collecting: $1 items, $2 pages, $3 s"],
   [/^(\d+) 条 \/ (\d+) 页 · ([\d.]+) 秒$/, "$1 items / $2 pages · $3 s"],
@@ -465,7 +485,7 @@ const ACTIONS = [
 ];
 const LIST_ACTIONS = new Set(["search_posts", "search_users", "get_comments", "get_replies", "get_user_posts", "get_feed", "get_trending"]);
 const ORDERS = { bilibili: { search_posts: [["totalrank", "综合"], ["click", "播放"], ["pubdate", "最新"]], get_user_posts: [["pubdate", "最新"], ["click", "播放"]], get_comments: [["3", "热门"], ["2", "时间"]] }, x: { search_posts: [["live", "最新"], ["top", "热门"]] }, reddit: { search_posts: [["relevance", "相关"], ["hot", "热门"], ["top", "最高"], ["new", "最新"]], get_user_posts: [["new", "最新"], ["hot", "热门"], ["top", "最高"]], get_comments: [["confidence", "最佳"], ["top", "最高"], ["new", "最新"]] }, zhihu: { get_user_posts: [["answers", "回答"], ["articles", "文章"]] } };
-const state = { platforms: [], status: null, page: "overview", platform: null, mode: "page", results: [], resultKind: "posts", cursor: null, lastRaw: null, cache: [], selected: null, ctx: null, history: [] };
+const state = { multi: new Set(), platforms: [], status: null, page: "overview", platform: null, mode: "page", results: [], resultKind: "posts", cursor: null, lastRaw: null, cache: [], selected: null, ctx: null, history: [] };
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -487,7 +507,7 @@ function itemKind(it) { if (!it) return "posts"; if (it.type === "topic") return
 function saveBlob(name, text, type) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
 const J = (v) => esc(JSON.stringify(v ?? ""));
 
-const TITLES = { overview: "概览", query: "查询", collect: "连续拉取", downloads: "下载", tasks: "任务", cache: "缓存", api: "接口" };
+const TITLES = { overview: "概览", query: "查询", multi: "多平台搜索", collect: "连续拉取", downloads: "下载", tasks: "任务", cache: "缓存", api: "接口" };
 document.querySelectorAll(".nav").forEach((b) => b.addEventListener("click", () => showPage(b.dataset.page)));
 function showPage(name) {
   state.page = name;
@@ -517,13 +537,61 @@ async function loadPlatforms() {
   $("q-platforms").innerHTML = state.platforms.map((p) => `<button class="chip" data-id="${p.id}">${logo(p.id, true)}${esc(p.name)}</button>`).join("");
   $("q-platforms").querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => selectPlatform(c.dataset.id)));
   if (!state.platform) selectPlatform(state.platforms[0]?.id);
+  try { for (const id of JSON.parse(localStorage.getItem("sl_multi") || "[]")) if (plat(id)) state.multi.add(id); } catch {}
+  renderMultiChips();
+}
+// ---- multi-platform search: one keyword fanned out to several platforms via GET /search --------
+const multiAction = () => ($("m-type").querySelector("button.on")?.dataset.v === "user" ? "search_users" : "search_posts");
+function renderMultiChips() {
+  const a = multiAction();
+  const avail = state.platforms.filter((p) => (p.capabilities || []).some((c) => c.action === a));
+  $("m-platforms").innerHTML = avail.map((p) => `<button class="chip${state.multi.has(p.id) ? " on" : ""}${state.status?.platforms?.[p.id]?.logged_in === false ? " off" : ""}" data-id="${p.id}">${logo(p.id, true)}${esc(p.name)}</button>`).join("");
+  $("m-platforms").querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { state.multi.has(c.dataset.id) ? state.multi.delete(c.dataset.id) : state.multi.add(c.dataset.id); c.classList.toggle("on", state.multi.has(c.dataset.id)); saveMulti(); }));
+}
+function saveMulti() { try { localStorage.setItem("sl_multi", JSON.stringify([...state.multi])); } catch {} }
+$("m-type").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { $("m-type").querySelectorAll("button").forEach((x) => x.classList.remove("on")); b.classList.add("on"); renderMultiChips(); }));
+$("m-all").addEventListener("click", () => { $("m-platforms").querySelectorAll(".chip").forEach((c) => state.multi.add(c.dataset.id)); saveMulti(); renderMultiChips(); });
+$("m-none").addEventListener("click", () => { state.multi.clear(); saveMulti(); renderMultiChips(); });
+$("m-keyword").addEventListener("keydown", (e) => e.key === "Enter" && $("m-run").click());
+$("m-run").addEventListener("click", runMulti);
+async function runMulti() {
+  const kw = $("m-keyword").value.trim(), a = multiAction();
+  const ids = [...$("m-platforms").querySelectorAll(".chip.on")].map((c) => c.dataset.id);
+  if (!kw) return toast("至少填一个关键词", true);
+  if (!ids.length) return toast("先选至少一个平台", true);
+  $("m-run").disabled = true; $("m-info").textContent = "同时搜索中…"; const t0 = Date.now();
+  try {
+    const r = await api(`/search?keyword=${encodeURIComponent(kw)}&platforms=${ids.join(",")}&type=${a === "search_users" ? "user" : "post"}`);
+    const secs = ((Date.now() - t0) / 1000).toFixed(1);
+    $("m-info").innerHTML = `<span>${secs} 秒</span>`;
+    const kind = a === "search_users" ? "users" : "posts";
+    $("m-results").innerHTML = r.data.results.map((e) => {
+      const q = e.quota || {};
+      const stat = e.error ? `<span class="err" title="${esc(e.error.message)}">${esc(e.error.code)}: ${esc(e.error.message)}</span>` : `<span>${e.items.length} 条${e.total ? "，共约 " + fmtN(e.total) : ""}${e.cursor ? "，可翻页" : "，没有更多"}</span>`;
+      const quota = q.page_loads ? ` · <span class="sub">页面 ${q.page_loads_used}/${q.page_loads} · ${Math.round(q.window_s / 60)} 分钟</span>` : "";
+      return `<div class="results" data-p="${esc(e.platform)}"><div class="toolbar">${logo(e.platform, true)}<b>${esc(pname(e.platform))}</b>${stat}${quota}<span class="sp"></span>${e.items.length ? `<button class="btn ghost" onclick="multiHandoff(${J(e.platform)})">在查询页翻页 →</button>` : ""}</div><div class="tablewrap" id="m-r-${esc(e.platform)}"></div></div>`;
+    }).join("");
+    state.multiLast = { keyword: kw, action: a, kind, results: r.data.results };
+    for (const e of r.data.results) if (e.items.length) renderItems($(`m-r-${e.platform}`), e.items, kind, e.platform);
+  } catch (e) { $("m-info").innerHTML = `<span style="color:var(--bad)">${esc(e.message)}</span>`; toast(e.message, true); }
+  finally { $("m-run").disabled = false; }
+}
+/** Carry one platform's multi-search results over to the query page so 下一页 continues from its cursor. */
+function multiHandoff(pid) {
+  const m = state.multiLast; const e = m?.results.find((x) => x.platform === pid); if (!e) return;
+  const form = { platform: pid, action: m.action, keyword: m.keyword, id: "", cid: "", xsec: "", mode: "page", limit: $("q-limit").value };
+  const count = `${e.items.length} 条${e.total ? "，共约 " + fmtN(e.total) : ""}${e.cursor ? "，可翻页" : "，没有更多"}`;
+  views[pid] = { results: e.items, kind: m.kind, cursor: e.cursor, ctx: { platform: pid, action: m.action, key: m.keyword, source: "多平台搜索", form, at: Date.now() }, lastRaw: e, count, info: "" };
+  showPage("query");
+  if (state.platform === pid) applyView(views[pid]); else selectPlatform(pid);
+  $("q-action").value = m.action; $("q-keyword").value = m.keyword; setMode("page"); syncForm();
 }
 async function loadStatus() {
   try {
     const st = (await api("/status")).data; state.status = st;
     const ext = st.extension;
     $("side-conn").innerHTML = `<span class="dot ${ext.online ? "ok" : "bad"}"></span> 后端 v${esc(st.backend_version)} · ${ext.online ? "扩展已连接" : "扩展未连接"}`;
-    $("q-platforms").querySelectorAll(".chip").forEach((c) => c.classList.toggle("off", st.platforms?.[c.dataset.id]?.logged_in === false));
+    for (const id of ["q-platforms", "m-platforms"]) $(id).querySelectorAll(".chip").forEach((c) => c.classList.toggle("off", st.platforms?.[c.dataset.id]?.logged_in === false));
     return st;
   } catch (e) { $("side-conn").innerHTML = `<span class="dot bad"></span> 后端不可达`; throw e; }
 }

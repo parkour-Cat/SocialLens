@@ -100,10 +100,14 @@ def build_server(base_url: str | None = None) -> MCPServer:
 
     # ---- data ----------------------------------------------------------------------
 
-    @server.tool(description="Search a platform. type=post searches posts/videos/notes, type=user searches accounts. Returns {items, cursor, total}; pass cursor back for the next page.")
+    @server.tool(description="Search one platform, or several at once by passing comma-separated platform ids (e.g. 'tiktok,x,xiaohongshu,youtube'): they run in parallel, each under its own rate limit, and the result is {keyword, type, results: [{platform, items, cursor, total, error, quota}]} with one entry per platform, so one platform's failure or captcha does not affect the others. type=post searches posts/videos/notes, type=user searches accounts. A single platform returns {items, cursor, total}; pass cursor back to that platform for the next page (cursor/order apply to single-platform calls only).")
     async def search(platform: str, keyword: str, type: str = "post", cursor: str | None = None, order: str | None = None) -> dict[str, Any]:
         if type not in ("post", "user"):
             raise ToolError("type must be 'post' or 'user'")
+        if "," in platform:
+            if cursor or order:
+                raise ToolError("cursor and order only apply to a single platform; page on with that platform's own search")
+            return await backend.call("GET", "/api/v1/search", {"keyword": keyword, "platforms": platform, "type": type})
         return await backend.call("GET", f"/api/v1/{platform}/search", {"keyword": keyword, "type": type, "cursor": cursor, "order": order})
 
     @server.tool(description="One post / video / note / article by its platform id (小红书 needs xsec_token from the referencing item). Includes media urls and metrics.")

@@ -335,7 +335,7 @@ def parse_get_trending(raw: Any) -> dict:
             "type": "topic",
             "platform": PLATFORM,
             "title": w["word"],
-            "url": f"{SITE}/search/{w['word']}?type=general",
+            "url": f"{SITE}/jingxuan/search/{w['word']}?type=general",
             "heat": _int(w.get("hot_value")),
             "description": None,
             "category": {1: "新", 3: "热", 4: "独家", 5: "首发", 8: "爆"}.get(_int(w.get("label")) or 0),

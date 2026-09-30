@@ -80,7 +80,7 @@ def test_get_feed():
 def test_build_params():
     a = DouyinAdapter()
     p = a.build_params("search_posts", {"keyword": "露营"})
-    assert p["_strategy"] == "navigate" and p["url"].startswith("https://www.douyin.com/search/") and p["url"].endswith("?type=video")
+    assert p["_strategy"] == "navigate" and p["url"].startswith("https://www.douyin.com/jingxuan/search/") and p["url"].endswith("?type=video")
     p = a.build_params("get_post", {"id": "123"})
     assert p["url"] == "https://www.douyin.com/video/123" and not p["keep_tab"]
     p = a.build_params("get_user_posts", {"id": "MS4w", "cursor": encode_cursor({"tab": 7})})

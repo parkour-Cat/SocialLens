@@ -48,10 +48,12 @@ class DouyinAdapter(PlatformAdapter):
 
     @staticmethod
     def _entry_url(action: str, p: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        # The site's own search box routes to /jingxuan/search/ since 2026-09; the legacy /search/
+        # path still calls the same APIs but intermittently answers 502 and returns 10 items instead of 20.
         if action == "search_posts":
-            return f"{SITE}/search/{quote(str(p.get('keyword', '')))}?type=video", {"keyword": p.get("keyword")}
+            return f"{SITE}/jingxuan/search/{quote(str(p.get('keyword', '')))}?type=video", {"keyword": p.get("keyword")}
         if action == "search_users":
-            return f"{SITE}/search/{quote(str(p.get('keyword', '')))}?type=user", {"keyword": p.get("keyword")}
+            return f"{SITE}/jingxuan/search/{quote(str(p.get('keyword', '')))}?type=user", {"keyword": p.get("keyword")}
         if action in ("get_post", "get_comments"):
             vid = str(p.get("id") or p.get("post_id") or "")
             return f"{SITE}/video/{vid}", {"id": vid}

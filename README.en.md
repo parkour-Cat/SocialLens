@@ -99,7 +99,7 @@ Open http://127.0.0.1:17800/ once the backend runs. A single static page, no bui
 
 ## REST API
 
-Every response is `{"success": true, "data": ...}` or `{"success": false, "error": {"code", "message"}}`. List endpoints return `data.items`, `data.total` and a top-level `cursor`; send the cursor back as is for the next page (a cursor is bound to a session tab and stays valid for ten minutes).
+Every response is `{"success": true, "data": ...}` or `{"success": false, "error": {"code", "message"}}`. List endpoints return `data.items`, `data.total` and a top-level `cursor`; send the cursor back as is for the next page (a cursor is bound to a session tab and stays valid for ten minutes; a new query of the same kind on that platform takes over the tab and voids the old cursor).
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -107,6 +107,7 @@ Every response is `{"success": true, "data": ...}` or `{"success": false, "error
 | GET | `/api/v1/platforms` | registered platforms and their capabilities |
 | GET | `/api/v1/resolve?q=` | which platform and object a link / id points to |
 | GET | `/api/v1/{platform}/search?keyword=&type=post\|user&cursor=` | search |
+| GET | `/api/v1/search?keyword=&platforms=a,b,c&type=post\|user` | search several platforms at once: parallel, each under its own rate limit, results grouped per platform with their own cursor and error |
 | GET | `/api/v1/{platform}/posts/{id}` | post detail |
 | GET | `/api/v1/{platform}/posts/{id}/comments?cursor=` | comments |
 | GET | `/api/v1/{platform}/posts/{id}/comments/{comment_id}/replies?cursor=` | replies under one comment |
@@ -152,7 +153,7 @@ claude mcp add sociallens -- uv run --project /path/to/SocialLens/backend social
 }
 ```
 
-Tools: `status`, `list_platforms`, `get_capabilities`, `search`, `get_post`, `get_comments`, `get_replies`, `get_user`, `get_user_posts`, `get_feed`, `get_trending`, `collect`, `download`, `list_downloads`, `get_task`, `resume`. Backend errors (`not_logged_in`, `captcha_required`, `cursor_expired`, …) are passed through as tool errors.
+Tools: `status`, `list_platforms`, `get_capabilities`, `search` (pass comma-separated platform ids to search several at once), `get_post`, `get_comments`, `get_replies`, `get_user`, `get_user_posts`, `get_feed`, `get_trending`, `collect`, `download`, `list_downloads`, `get_task`, `resume`. Backend errors (`not_logged_in`, `captcha_required`, `cursor_expired`, …) are passed through as tool errors.
 
 ## Downloads and proxies
 

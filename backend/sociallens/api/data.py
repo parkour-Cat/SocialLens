@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from pydantic import BaseModel
@@ -58,6 +59,52 @@ async def search(
     """Search a platform. type=post: posts / videos / notes; type=user: accounts. order is platform-specific. Paginate with cursor."""
     action = "search_posts" if type == "post" else "search_users"
     return await _run(request, platform, action, {"keyword": keyword, "cursor": cursor, "order": order}, kind="posts" if type == "post" else "users")
+
+
+def _quota(request: Request, platform: str) -> dict[str, Any]:
+    """Page-load budget of one platform queue (what risk control actually counts)."""
+    st = state(request)
+    rl = st.registry.get(platform).rate_limit
+    q = st.tasks.status().get(platform) or {}
+    return {
+        "page_loads_used": q.get("page_loads_in_window", 0),
+        "page_loads": rl.page_loads,
+        "window_s": rl.window_s,
+        "budget_wait_s": q.get("budget_wait_s", 0),
+        "paused_for_s": q.get("paused_for_s", 0),
+    }
+
+
+@router.get("/search")
+async def search_all(
+    request: Request,
+    keyword: str = Query(min_length=1),
+    platforms: str = Query(min_length=1, description="comma-separated platform ids"),
+    type: str = Query(default="post", pattern="^(post|user)$"),
+):
+    """Search several platforms at once with one keyword (platforms is comma-separated). Every platform runs in its own queue, in parallel, under its own rate limit and page-load budget, so this costs each platform exactly one page load, the same as searching it alone. One page per platform, no retries: a platform that fails or hits risk control is reported in its own entry and does not affect the others. Results stay grouped per platform (metrics are not comparable across sites); page on with /{platform}/search and that entry's cursor. quota shows each platform's page-load budget."""
+    ids: list[str] = []
+    for pid in (p.strip() for p in platforms.split(",")):
+        if pid and pid not in ids:
+            _adapter(request, pid)  # unknown names fail the whole call: a typo should be loud
+            ids.append(pid)
+    action = "search_posts" if type == "post" else "search_users"
+    kind = "posts" if type == "post" else "users"
+
+    async def one(pid: str) -> dict[str, Any]:
+        entry: dict[str, Any] = {"platform": pid, "items": [], "total": None, "cursor": None, "task_id": None, "error": None}
+        try:
+            r = await _run(request, pid, action, {"keyword": keyword}, kind=kind)
+            entry.update(items=r["data"]["items"], total=r["data"].get("total"), cursor=r.get("cursor"), task_id=r.get("task_id"))
+        except SocialLensError as e:
+            entry["error"] = e.to_dict()
+        except Exception as e:  # noqa: BLE001 - one platform must never take the others down
+            entry["error"] = {"code": ErrorCode.INTERNAL.value, "message": str(e)[:300]}
+        entry["quota"] = _quota(request, pid)
+        return entry
+
+    results = await asyncio.gather(*(one(pid) for pid in ids))
+    return ok({"keyword": keyword, "type": type, "results": list(results)})
 
 
 # `xsec_token` is a 小红书 access token attached to every note/user reference (see
