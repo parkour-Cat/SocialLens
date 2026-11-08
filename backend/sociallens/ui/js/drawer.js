@@ -2,7 +2,7 @@
 // their profile plus their posts, comments show the comment. Call-strategy platforms fetch the full detail
 // automatically (debounced, memoised); navigate-strategy ones wait for a click because it costs a page load.
 import { actCtx, $, esc, J, fmtN, fmtT, fmtDur, api, toast, on, act, go, logo, pname, pcolor, capsOf, strategy, itemKind, xs, IC, parseHash, hashFor } from "./core.js";
-import { getList, listId, renderList, renderThread, avatar, titleOf, viewOf, viewSeg, setView } from "./results.js";
+import { getList, listId, renderList, renderThread, avatar, titleOf, viewOf, viewSeg, setView, isReply } from "./results.js";
 
 const D = { stack: [], cur: null, full: false, pushed: false, timer: null };
 const DETAIL = new Map();   // "pid:id" -> merged full post
@@ -249,7 +249,7 @@ export function render() {
   const body = c.loading ? `<div class="skel"><div class="sk" style="height:220px"></div><div class="sk" style="height:18px;width:70%"></div><div class="sk" style="height:14px;width:40%"></div></div>`
     : c.missing ? `<div class="empty">本地缓存里没有这一条。<br>${c.kind === "posts" && capsOf(c.pid).has("get_post") ? `<button class="btn sm" data-act="drDetail" style="margin-top:10px">从${esc(pname(c.pid))}加载</button>` : ""}</div>`
     : c.kind === "users" ? userContent(c) : c.kind === "comments" ? commentContent(c) : c.tab === "comments" ? commentsTab(c) : postContent(c);
-  el.innerHTML = `<div class="dh">${D.stack.length ? `<button class="iconbtn" data-act="drBack" title="返回">${IC.back}</button>` : ""}${logo(c.pid)}<span class="dhp">${esc(pname(c.pid))}</span><span class="pill">${typeName}</span><span class="mono faint ell">${esc(it.id)}</span><span class="sp"></span>${it.url ? `<a class="iconbtn" href="${esc(it.url)}" target="_blank" rel="noreferrer" title="在原平台打开">${IC.ext}</a>` : ""}<button class="iconbtn" data-act="drFull" title="${D.full ? "收起为侧栏" : "展开为全宽详情页"}">${D.full ? IC.shrink : IC.expand}</button><button class="iconbtn" data-act="drClose" title="关闭（Esc）">${IC.x}</button></div>${tabs}<div class="db" id="dr-scroll" data-key="${esc(key(it))}"><div class="dbi" style="--pc:${pcolor(c.pid)}">${body}</div></div>`;
+  el.innerHTML = `<div class="dh">${D.stack.length ? `<button class="iconbtn" data-act="drBack" title="返回">${IC.back}</button>` : ""}${logo(c.pid)}<span class="dhp">${esc(pname(c.pid))}</span><span class="pill">${typeName}</span>${c.kind === "posts" && isReply(it) ? `<span class="pill reply">↩ 回复</span>` : ""}<span class="mono faint ell">${esc(it.id)}</span><span class="sp"></span>${it.url ? `<a class="iconbtn" href="${esc(it.url)}" target="_blank" rel="noreferrer" title="在原平台打开">${IC.ext}</a>` : ""}<button class="iconbtn" data-act="drFull" title="${D.full ? "收起为侧栏" : "展开为全宽详情页"}">${D.full ? IC.shrink : IC.expand}</button><button class="iconbtn" data-act="drClose" title="关闭（Esc）">${IC.x}</button></div>${tabs}<div class="db" id="dr-scroll" data-key="${esc(key(it))}"><div class="dbi" style="--pc:${pcolor(c.pid)}">${body}</div></div>`;
   if (keep) $("dr-scroll").scrollTop = keep;
 }
 // drDetail also covers route items missing from the cache: fetch get_post by id

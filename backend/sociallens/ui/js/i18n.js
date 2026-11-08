@@ -133,7 +133,7 @@ Object.assign(EN, {
   "请填写 id": "Enter an id", "选中的平台都不支持这种搜索": "None of the selected platforms supports this search", "查过的查询、帖子、用户、评论都存在本地 SQLite": "Every query, post, user and comment is kept in local SQLite", "查询记录": "Queries", "最多": "Up to", "按最近更新排序": "sorted by last update", "打开结果 →": "Open results →",
   "进行中": "Running", "已完成": "Finished", "全部类型": "All types", "新建下载": "New download", "查看结果 →": "View results →", "粘贴链接会自动识别平台": "A pasted link picks the platform", "（小红书需要，链接里自带的会自动带上）": "(Xiaohongshu needs it; a pasted link carries it)",
   "没有进行中的任务。在「搜索」里把条数切到「连续到 N 条」，或在结果、详情里点「下载」。": "Nothing running. Switch the count to \"up to N items\" on Search, or click Download on a result.",
-  "一切正常：扩展已连接，没有暂停的队列，没有异常的探测。": "All good: extension connected, no paused queues, no failing probes.", "去搜索": "Search here", "主题：跟随系统": "Theme: system", "主题：浅色": "Theme: light", "主题：深色": "Theme: dark", "队列": "Queue", "内容": "Content", "视频": "Video", "动态": "Post",
+  "一切正常：扩展已连接，没有暂停的队列，没有异常的探测。": "All good: extension connected, no paused queues, no failing probes.", "去搜索": "Search here", "主题：跟随系统": "Theme: system", "主题：浅色": "Theme: light", "主题：深色": "Theme: dark", "队列": "Queue", "↩ 回复": "↩ Reply", "来源：全部缓存": "Source: whole cache", "只看某次查询抓到的": "Only what one query returned", "内容": "Content", "视频": "Video", "动态": "Post",
 });
 EN_RX.push(
   [/^\/(\d+) 平台已登录$/, "/$1 platforms signed in"],
@@ -151,6 +151,7 @@ EN_RX.push(
   [/^(\S+) 条评论$/, "$1 comments"],
   [/^已加载 (\d+)$/, "$1 loaded"],
   [/^下载目录 (.+)$/, "Download folder $1"],
+  [/^来自 (\S+ \S+) 的(.+?)(?:「(.+)」)?，按当时的顺序$/, (_, t, act, k) => `from the ${trWord(act)}${k ? ` "${k}"` : ""} at ${t}, in its original order`],
 );
 export function installI18n() {
   if (ZH) return;

@@ -6,22 +6,23 @@ const platOptions = (v, all = "全部平台") => `<option value="">${all}</optio
 const head = (eyebrow, title, stats = "") => `<div class="ph"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1></div><div class="stats">${stats}</div></div>`;
 
 // ---- 数据 ---------------------------------------------------------------------------------------------
-const DK = { k: "queries", p: "", q: "", n: 200 }; let dItems = [];
+const DK = { k: "queries", p: "", q: "", n: 200, s: "" }; let dItems = [];
 const SOURCE_NAME = { api: "接口调用", multi_search: "多平台搜索", collect: "连续拉取" };
 export function showData(q) {
-  if (q) { DK.k = q.get("k") || DK.k; DK.p = q.get("p") ?? DK.p; DK.q = q.get("q") ?? DK.q; DK.n = Number(q.get("n")) || DK.n; }
+  if (q) { DK.k = q.get("k") || DK.k; DK.p = q.get("p") ?? DK.p; DK.q = q.get("q") ?? DK.q; DK.n = Number(q.get("n")) || DK.n; DK.s = q.get("s") ?? ""; }
   $("main").innerHTML = `<div class="wrap">${head("DATA", "数据", `<span>查过的查询、帖子、用户、评论都存在本地 SQLite</span>`)}
     <div class="cmd"><div class="frow"><div class="seg">${[["queries", "查询记录"], ["posts", "帖子"], ["users", "用户"], ["comments", "评论"]].map(([k, n]) => `<button class="${DK.k === k ? "on" : ""}" data-act="dKind" data-arg='${J(k)}'>${n}</button>`).join("")}</div>
     <select id="d-platform" class="field w160">${platOptions(DK.p)}</select>
-    ${DK.k === "queries" ? `<div class="kw">${IC.search}<input id="d-q" class="field" value="${esc(DK.q)}" placeholder="关键词 / id" autocomplete="off"><kbd>/</kbd></div>` : `<label class="inl faint">最多<input id="d-n" class="field w80" type="number" min="1" max="1000" value="${DK.n}">条</label><span class="sp"></span>`}
+    ${DK.k === "queries" ? `<div class="kw">${IC.search}<input id="d-q" class="field" value="${esc(DK.q)}" placeholder="关键词 / id" autocomplete="off"><kbd>/</kbd></div>` : `<select id="d-src" class="field" style="min-width:220px;max-width:420px" title="只看某次查询抓到的"><option value="">来源：全部缓存</option></select><label class="inl faint" ${DK.s ? "hidden" : ""}>最多<input id="d-n" class="field w80" type="number" min="1" max="1000" value="${DK.n}">条</label><span class="sp"></span>`}
     <button class="btn" data-act="dLoad">刷新</button></div></div>
     <div id="d-out"><section class="res"><div class="rbusy"><span class="spin"></span>加载中…</div></section></div></div>`;
   loadData();
 }
-const dHash = () => history.replaceState(null, "", hashFor("data", { k: DK.k, p: DK.p, q: DK.k === "queries" ? DK.q : "", n: DK.k === "queries" ? "" : DK.n }));
-on("dKind", (k) => { DK.k = k; dHash(); showData(); });
+const dHash = () => history.replaceState(null, "", hashFor("data", { k: DK.k, p: DK.p, q: DK.k === "queries" ? DK.q : "", n: DK.k === "queries" || DK.s ? "" : DK.n, s: DK.k === "queries" ? "" : DK.s }));
+on("dKind", (k) => { DK.k = k; DK.s = ""; dHash(); showData(); });
 on("dLoad", () => { dHash(); loadData(); });
-document.addEventListener("change", (e) => { if (e.target.id === "d-platform") { DK.p = e.target.value; dHash(); loadData(); } if (e.target.id === "d-n") { DK.n = Number(e.target.value) || 200; dHash(); loadData(); } });
+document.addEventListener("change", (e) => { if (e.target.id === "d-platform") { DK.p = e.target.value; DK.s = ""; dHash(); showData(); }
+  if (e.target.id === "d-src") { DK.s = e.target.value; dHash(); showData(); } if (e.target.id === "d-n") { DK.n = Number(e.target.value) || 200; dHash(); loadData(); } });
 document.addEventListener("input", (e) => { if (e.target.id === "d-q") DK.q = e.target.value; });
 document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.id === "d-q") { dHash(); loadData(); } });
 async function loadData() {
@@ -32,10 +33,16 @@ async function loadData() {
       const rows = (await api("/queries?" + q)).data;
       out.innerHTML = `<section class="res"><div class="rh"><b>查询记录</b><span class="faint">${rows.length} 条 · 每次列表查询都记下返回了哪些条目；指标每次变化存一份快照</span></div>${rows.length ? `<div class="rows">${rows.map((r) => `<div class="lrow" data-act="dOpen" data-arg="${r.id}" data-nav><span class="mono faint">${esc(fmtT(r.at))}</span>${logo(r.platform)}<span class="strong">${esc(pname(r.platform))}</span><span class="mute">${esc(actionName(r.action))}</span>${r.key ? `<span class="mono ell">${esc(r.key)}</span>` : ""}<span class="sp"></span><span class="pill">${esc(SOURCE_NAME[r.source] || r.source)}</span><span class="num faint">${r.count} 条</span><span class="go">打开结果 →</span></div>`).join("")}</div>` : `<div class="empty">还没有查询记录</div>`}</section>`;
     } else {
-      const q = new URLSearchParams({ kind: DK.k, limit: String(DK.n) }); if (DK.p) q.set("platform", DK.p);
-      dItems = (await api("/items?" + q)).data;
-      const pid = DK.p || null;
-      out.innerHTML = `<section class="res"><div class="rh"><b>${{ posts: "帖子", users: "用户", comments: "评论" }[DK.k]}</b><span class="faint">${dItems.length} 条 · 按最近更新排序</span><span class="sp"></span>${viewSeg(pid, DK.k, "dView")}<button class="btn ghost sm" data-act="dExport" data-arg='"json"'>导出 JSON</button><button class="btn ghost sm" data-act="dExport" data-arg='"csv"'>导出 CSV</button></div>${renderList(dItems, DK.k, pid, viewOf(pid, DK.k), { showPlatform: !pid })}</section>`;
+      // "来源" lists the queries that returned this kind, so one feed / search can be looked at on its own
+      const ql = new URLSearchParams({ limit: "100" }); if (DK.p) ql.set("platform", DK.p);
+      const srcs = (await api("/queries?" + ql).catch(() => ({ data: [] }))).data.filter((r) => r.kind === DK.k);
+      if ($("d-src")) $("d-src").innerHTML = `<option value="">来源：全部缓存</option>` + srcs.map((r) => `<option value="${r.id}" ${String(r.id) === String(DK.s) ? "selected" : ""}>${esc(fmtT(r.at))} · ${esc(DK.p ? "" : pname(r.platform) + " · ")}${esc(actionName(r.action))}${r.key ? " · " + esc(r.key) : ""} · ${r.count} 条</option>`).join("");
+      let src = null;
+      if (DK.s) { src = (await api(`/queries/${DK.s}`)).data; dItems = src.items || []; }
+      else { const q = new URLSearchParams({ kind: DK.k, limit: String(DK.n) }); if (DK.p) q.set("platform", DK.p); dItems = (await api("/items?" + q)).data; }
+      const pid = DK.p || src?.platform || null;
+      const what = src ? `${dItems.length} 条 · 来自 ${fmtT(src.at)} 的${actionName(src.action)}${src.key ? "「" + src.key + "」" : ""}，按当时的顺序` : `${dItems.length} 条 · 按最近更新排序`;
+      out.innerHTML = `<section class="res"><div class="rh"><b>${{ posts: "帖子", users: "用户", comments: "评论" }[DK.k]}</b><span class="faint">${esc(what)}</span><span class="sp"></span>${viewSeg(pid, DK.k, "dView")}<button class="btn ghost sm" data-act="dExport" data-arg='"json"'>导出 JSON</button><button class="btn ghost sm" data-act="dExport" data-arg='"csv"'>导出 CSV</button></div>${renderList(dItems, DK.k, pid, viewOf(pid, DK.k), { showPlatform: !pid })}</section>`;
     }
   } catch (e) { out.innerHTML = `<section class="res"><div class="banner bad">${esc(e.message)}</div></section>`; }
 }
