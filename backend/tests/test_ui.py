@@ -8,7 +8,13 @@ def test_ui_served(client):
     assert r.status_code in (301, 302, 307, 308) and r.headers["location"].rstrip("/") == "/ui"
     r = client.get("/ui/")
     assert r.status_code == 200 and "text/html" in r.headers["content-type"]
-    assert "SocialLens" in r.text and "/api/v1" in r.text
+    assert "SocialLens" in r.text and 'src="js/app.js"' in r.text
+    # the console is plain ES modules served from the package: no build step
+    for path in ("js/app.js", "js/core.js", "js/search.js", "js/drawer.js", "js/results.js", "js/pages.js", "js/status.js", "js/apidoc.js", "js/i18n.js"):
+        m = client.get("/ui/" + path)
+        assert m.status_code == 200 and "javascript" in m.headers["content-type"], path
+    assert "/api/v1" in client.get("/ui/js/core.js").text
+    assert client.get("/ui/css/app.css").status_code == 200
 
 
 def test_items_routes(client, app):

@@ -14,7 +14,7 @@
 
 A Chrome extension intercepts and executes each site's own requests inside your signed-in tabs and hands the data to a local FastAPI backend. The backend serves a unified REST API, an MCP server and a web console on `127.0.0.1:17800`. No platform API keys, and the backend never touches your credentials.
 
-![Console: query page with the detail drawer](docs/assets/console-query.en.png)
+![Console: search page with the detail drawer](docs/assets/console-query.en.png)
 
 > For personal use only: your own accounts, the content you can already see. The project does no captcha solving, no risk-control evasion and no login automation. When a site shows a captcha, the task fails and the queue pauses until you handle it yourself.
 
@@ -88,11 +88,13 @@ The backend recognises the extension by the fixed extension id from the `key` fi
 
 ## Console
 
-Open http://127.0.0.1:17800/ once the backend runs. A single static page, no build step, dark mode follows the system. The language follows the browser and can be switched at the bottom of the sidebar (Chinese / English).
+Open http://127.0.0.1:17800/ once the backend runs. Static files and native ES modules, no build step. Dark mode follows the system (switchable at the bottom left), the language follows the browser and can be switched at the bottom left too. The address bar keeps the page and query, so reloads, back / forward and bookmarks keep their results.
 
-- **Overview**: one tile per platform with login state, queue state and the page-load budget; a banner with a one-click resume when risk control paused a queue; recent tasks and download progress.
-- **Query**: pick a platform, an action and parameters, in "one page" or "up to N items" mode. Results switch columns for posts, users, comments and topics; comments render as threads with inline reply loading; a row opens a detail drawer (metrics, media, quoted posts and link cards, raw JSON). Paging, JSON / CSV export. Results are kept per platform, and the top input resolves pasted links, ids or keywords.
-- **Collect, Downloads, Tasks, Cache**: task lists with progress and cancel; everything queried is stored in local SQLite and can be browsed and exported by platform.
+- **Search**: one command bar for platform, action and parameters, in "one page" or "up to N items" mode; cmd / ctrl + click a platform to search several at once, with results grouped per platform. Pasted post or user links are resolved. Results switch between a table and cards (image-first sites such as Xiaohongshu and Douyin default to cards); comments render as threads. Keys: `/` focus the input, `j` `k` move, `o` open, `t` table / cards.
+- **Detail drawer**: laid out per content type (video, image carousel, long article, tweet card); links, @mentions and #topics in the text are clickable. Tabs for comments, the author's profile and posts, metric history, media downloads and raw JSON; expands to a full page. Platforms that can fetch the full detail without opening a page do so automatically; the ones that need a page load wait for a click, to save the page-load budget.
+- **Data**: query history and the local cache (posts, users, comments), browsable by platform and exportable as JSON / CSV; any past query reopens in one click.
+- **Tasks**: collects, downloads and other tasks in one list, grouped as running / finished / failed, with progress and cancel; new downloads start here.
+- **Status**: alerts first (paused queues with one-click resume, failing probes, extension offline), then one tile per platform with login state, page-load budget and probe result, then the risk-control log.
 - **API**: the capability matrix (hover a platform icon for its notes), the REST list generated from OpenAPI with curl examples (GET endpoints can be tried in place), and the MCP tool list with the connect command.
 
 ![Console: API page](docs/assets/console-api.en.png)
