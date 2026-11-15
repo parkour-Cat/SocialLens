@@ -18,6 +18,23 @@ A Chrome extension intercepts and executes each site's own requests inside your 
 
 > For personal use only: your own accounts, the content you can already see. The project does no captcha solving, no risk-control evasion and no login automation. When a site shows a captcha, the task fails and the queue pauses until you handle it yourself.
 
+## What it is for
+
+**Good for** quick lookups and small-scale research:
+
+- Search a keyword, read a post's comments, look at an account's profile and posts, from the console or by asking an AI such as Claude over MCP.
+- Compare one topic across several platforms side by side.
+- Follow how a handful of posts or accounts change (every query snapshots the metrics).
+- Gather material for topic research, competitor analysis or content planning, in the hundreds to a few thousand items.
+- Keep copies of videos and images you can already see.
+
+**Not for**:
+
+- Bulk collection of tens or hundreds of thousands of items, or long unattended runs. It uses your one browser and one set of accounts, spaces requests 2–6 s apart per platform, opens at most 8–40 new pages per platform every 10 minutes, and stops for you when a captcha appears.
+- Servers or headless machines: the extension needs a Chrome with a window.
+- Rotating accounts, proxy pools, or reaching content your own account cannot see.
+- Commercial use (see [License](#license)).
+
 ## How it works
 
 ![Architecture](docs/assets/architecture.en.png)
