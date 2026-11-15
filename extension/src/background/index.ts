@@ -1,167 +1,26 @@
-// Service worker: keeps the WebSocket to the backend, routes tasks to platform tabs,
-// tracks per-platform tab/login state, forwards captures when a platform is recording.
+// Service worker entry: wires the backend link (link.ts) to task execution (execute.ts), answers
+// content scripts and the popup, reports status, and keeps the connection alive.
+//
+//   link.ts        WebSocket to the backend, config, reconnect
+//   tabs.ts        owned-tab pool, platform tabs, login state, content-script reachability
+//   workwindow.ts  the separate window the extension's tabs live in
+//   execute.ts     running a task in a tab (in-tab calls, navigate + capture / page action)
 
-import { runUntilSettled } from "./settle";
-import { TabPool } from "./tabpool";
-import { pagePlatformActions } from "../page/platforms/catalog";
-import { platformById, platformForUrl, platforms, type PlatformDef } from "../platforms";
-import { hostMatches } from "../platforms/types";
-import { log, setVerbose } from "../shared/log";
-import type {
-  BackendToExt,
-  BgToContent,
-  ContentToBg,
-  ExtStatus,
-  ExtToBackend,
-  PopupToBg,
-  TaskError,
-  TaskSpec,
-} from "../shared/messages";
+import { platformForUrl, platforms } from "../platforms";
+import { log } from "../shared/log";
+import type { BackendToExt, ContentToBg, ExtStatus, PopupToBg } from "../shared/messages";
+import { BUILD } from "./env";
+import { cancelTask, pendingCount, rejectAllPending, runTask, settlePageResult } from "./execute";
+import { DEFAULT_BACKEND, connect, httpBase, linkState, loadConfig, onBackendClosed, onBackendMessage, reconnectNow, remoteLog, wsSend } from "./link";
+import { broadcastTabStates, isLoggedIn, pool, pushCaptureConfig, recording, scheduleTabStates, tabPlatform, tabsForPlatform } from "./tabs";
 
-declare const __BUILD_ID__: string;
-const VERSION = chrome.runtime.getManifest().version;
-const BUILD = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
-const DEFAULT_BACKEND = "ws://127.0.0.1:17800/ws/extension";
-const RECONNECT_MAX_MS = 30_000;
 const ALARM = "sociallens-keepalive";
 
-class ExtError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public details?: Record<string, unknown>,
-  ) {
-    super(message);
-  }
-}
-
-function toError(e: unknown): TaskError {
-  if (e instanceof ExtError) return { code: e.code, message: e.message, details: e.details };
-  return { code: "extension_error", message: e instanceof Error ? e.message : String(e) };
-}
-
-// ---- config -------------------------------------------------------------------
-
-interface Config {
-  backendUrl: string;
-  token: string;
-  verbose: boolean;
-}
-
-async function loadConfig(): Promise<Config> {
-  const s = await chrome.storage.local.get(["backendUrl", "token", "verbose"]);
-  const cfg = {
-    backendUrl: (s.backendUrl as string) || DEFAULT_BACKEND,
-    token: (s.token as string) || "",
-    verbose: Boolean(s.verbose),
-  };
-  setVerbose(cfg.verbose);
-  return cfg;
-}
-
-// ---- connection state -----------------------------------------------------------
-
-let ws: WebSocket | null = null;
-let connected = false;
-let backendVersion: string | null = null;
-let lastError: string | null = null;
-let reconnectDelay = 1000;
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let currentConfig: Config | null = null;
-
-const recording = new Set<string>();
-const pendingPage = new Map<string, { resolve: (v: unknown) => void; reject: (e: unknown) => void; tabId: number }>();
-const cancelledTasks = new Set<string>();
-
-function wsSend(msg: ExtToBackend): void {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
-}
-
-function remoteLog(level: "debug" | "info" | "warning" | "error", msg: string, fields: Record<string, unknown> = {}): void {
-  wsSend({ type: "log", level, msg, ...fields });
-}
-
-let connecting: Promise<void> | null = null;
-
-/** Idempotent: concurrent callers share one attempt; a live socket is never duplicated. */
-function connect(): Promise<void> {
-  if (connecting) return connecting;
-  if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return Promise.resolve();
-  connecting = doConnect().finally(() => {
-    connecting = null;
-  });
-  return connecting;
-}
-
-async function doConnect(): Promise<void> {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer);
-    reconnectTimer = null;
-  }
-  // No token is needed in the normal case: the backend recognises this extension by the
-  // Origin header (chrome-extension://<fixed id>). A token is only a fallback.
-  currentConfig = await loadConfig();
-  log.info("connecting", currentConfig.backendUrl);
-  let socket: WebSocket;
-  try {
-    socket = new WebSocket(currentConfig.backendUrl);
-  } catch (e) {
-    lastError = `bad backend url: ${String(e)}`;
-    scheduleReconnect();
-    return;
-  }
-  ws = socket;
-  socket.onopen = () => {
-    if (ws !== socket) return;
-    wsSend({ type: "auth", token: currentConfig!.token, extension_version: VERSION, actions: pagePlatformActions() });
-  };
-  socket.onmessage = (ev) => {
-    if (ws !== socket) return; // stale socket
-    let msg: BackendToExt;
-    try {
-      msg = JSON.parse(String(ev.data));
-    } catch {
-      return;
-    }
-    void handleBackend(msg);
-  };
-  socket.onerror = () => {
-    if (ws === socket) lastError = "connection error (is the backend running?)";
-  };
-  socket.onclose = (ev) => {
-    if (ws !== socket) return; // a newer socket owns the state; nothing to do
-    ws = null;
-    const wasConnected = connected;
-    connected = false;
-    backendVersion = null;
-    if (ev.code === 4003) lastError = "backend rejected this extension (unexpected extension id and no valid token)";
-    else if (ev.code !== 1000) lastError = ev.reason || `closed (${ev.code})`;
-    for (const [id, p] of pendingPage) {
-      p.reject(new ExtError("extension_offline", "backend disconnected"));
-      pendingPage.delete(id);
-    }
-    if (wasConnected) log.warn("disconnected", ev.code, ev.reason);
-    if (ev.code !== 4003) scheduleReconnect();
-  };
-}
-
-function scheduleReconnect(): void {
-  if (reconnectTimer) return;
-  reconnectTimer = setTimeout(() => {
-    reconnectTimer = null;
-    void connect();
-  }, reconnectDelay);
-  reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
-}
+// ---- messages from the backend ---------------------------------------------------------
 
 async function handleBackend(msg: BackendToExt): Promise<void> {
   switch (msg.type) {
     case "hello":
-      connected = true;
-      backendVersion = msg.backend_version;
-      lastError = null;
-      reconnectDelay = 1000;
-      log.info("connected to backend", msg.backend_version);
       await broadcastTabStates(true);
       break;
     case "ping":
@@ -173,15 +32,7 @@ async function handleBackend(msg: BackendToExt): Promise<void> {
       break;
     }
     case "task.cancel":
-      cancelledTasks.add(msg.id);
-      {
-        const p = pendingPage.get(msg.id);
-        if (p) {
-          pendingPage.delete(msg.id);
-          sendToTab(p.tabId, { type: "task.cancel", id: msg.id }).catch(() => {});
-          p.reject(new ExtError("cancelled", "cancelled by backend"));
-        }
-      }
+      cancelTask(msg.id);
       break;
     case "record.set":
       if (msg.enabled) recording.add(msg.platform);
@@ -191,434 +42,8 @@ async function handleBackend(msg: BackendToExt): Promise<void> {
   }
 }
 
-// ---- tabs -----------------------------------------------------------------------
-
-// Tabs the extension owns (session / helper tabs in the work window), cursor keys, and which
-// tab a navigate task may take over: see tabpool.ts (unit-tested, no chrome.* inside).
-const pool = new TabPool({
-  getTab: async (id) => {
-    const t = await chrome.tabs.get(id).catch(() => null);
-    return t?.id != null ? { id: t.id, url: t.url, pendingUrl: t.pendingUrl, index: t.index, windowId: t.windowId } : null;
-  },
-  removeTab: (id) => chrome.tabs.remove(id).catch(() => {}),
-  reachable: (id) => waitContentReady(id, 1_500).then(() => true, () => false),
-  log: (msg, ...args) => log.debug(msg, ...args),
-});
-
-async function tabsForPlatform(def: PlatformDef): Promise<chrome.tabs.Tab[]> {
-  const all = await chrome.tabs.query({});
-  return all.filter((t) => {
-    if (!t.url || t.id == null || pool.isClosing(t.id)) return false;
-    try {
-      return hostMatches(def, new URL(t.url).hostname);
-    } catch {
-      return false;
-    }
-  });
-}
-
-async function isLoggedIn(def: PlatformDef): Promise<boolean> {
-  if (!def.loginCookie) return true;
-  try {
-    const c = await chrome.cookies.get({ url: def.loginCookie.url, name: def.loginCookie.name });
-    return !!c?.value;
-  } catch {
-    return false;
-  }
-}
-
-const lastTabState = new Map<string, string>();
-let tabStateTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function broadcastTabStates(force = false): Promise<void> {
-  for (const def of platforms) {
-    const tabs = await tabsForPlatform(def);
-    const state = { platform: def.id, logged_in: await isLoggedIn(def), tab_ids: tabs.map((t) => t.id!).sort() };
-    const key = JSON.stringify(state);
-    if (force || lastTabState.get(def.id) !== key) {
-      lastTabState.set(def.id, key);
-      wsSend({ type: "tab.state", ...state });
-    }
-  }
-}
-
-function scheduleTabStates(): void {
-  if (tabStateTimer) clearTimeout(tabStateTimer);
-  tabStateTimer = setTimeout(() => {
-    tabStateTimer = null;
-    void broadcastTabStates();
-  }, 400);
-}
-
-chrome.tabs.onUpdated.addListener((_id, info) => {
-  if (info.status || info.url) scheduleTabStates();
-});
-chrome.tabs.onRemoved.addListener(scheduleTabStates);
-chrome.tabs.onCreated.addListener(scheduleTabStates);
-chrome.cookies.onChanged.addListener((info) => {
-  if (platforms.some((p) => p.loginCookie?.name === info.cookie.name)) scheduleTabStates();
-});
-
-/** Resolves once a navigation in the tab commits (URL change) or finishes; never rejects. */
-function waitTabNavigated(tabId: number, timeoutMs: number): Promise<void> {
-  return new Promise((resolve) => {
-    const finish = () => {
-      chrome.tabs.onUpdated.removeListener(listener);
-      clearTimeout(timer);
-      resolve();
-    };
-    // A bare "complete" can belong to the previous document still finishing; require either a
-    // URL change (commit) or a loading -> complete sequence observed after we started waiting.
-    let sawLoading = false;
-    const listener = (id: number, info: chrome.tabs.TabChangeInfo) => {
-      if (id !== tabId) return;
-      if (info.status === "loading") sawLoading = true;
-      if (info.url || (sawLoading && info.status === "complete")) finish();
-    };
-    chrome.tabs.onUpdated.addListener(listener);
-    const timer = setTimeout(finish, timeoutMs);
-  });
-}
-
-async function sendToTab(tabId: number, msg: BgToContent): Promise<{ ok: boolean; doc?: string; page_build?: string | null } | undefined> {
-  return chrome.tabs.sendMessage(tabId, msg);
-}
-
-/**
- * Resolves with the document id once the tab's content script answers. With `notDoc`, keeps
- * polling until a *different* document answers: Chrome updates a tab's URL when a navigation
- * starts, while the old document (and its content script) may still be alive for a while.
- */
-async function waitContentReady(tabId: number, timeoutMs = 10_000, notDoc?: string): Promise<string> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const res = await sendToTab(tabId, { type: "capture.config", enabled: captureEnabledForTab(tabId) });
-      const doc = res?.doc ?? "";
-      // A document whose page script is from another build (loaded before an extension reload)
-      // would answer with stale action code; treat it as not ready so a fresh tab gets opened.
-      const buildOk = res?.page_build === BUILD;
-      if (buildOk && (!notDoc || doc !== notDoc)) return doc;
-      if (!buildOk) lastBuildMismatch = res?.page_build ?? "none";
-    } catch {
-      /* not injected yet */
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new ExtError(
-    "extension_error",
-    notDoc ? "navigated document did not become reachable" : `content script not reachable in tab${lastBuildMismatch ? ` (page build ${lastBuildMismatch}, expected ${BUILD}; reload that page)` : ""}`,
-  );
-}
-let lastBuildMismatch: string | null = null;
-
-const tabPlatform = new Map<number, string>();
-
-function captureEnabledForTab(tabId: number): boolean {
-  const pid = tabPlatform.get(tabId);
-  return !!pid && recording.has(pid);
-}
-
-async function pushCaptureConfig(platformId: string): Promise<void> {
-  const def = platformById(platformId);
-  if (!def) return;
-  for (const t of await tabsForPlatform(def)) {
-    sendToTab(t.id!, { type: "capture.config", enabled: recording.has(platformId) }).catch(() => {});
-  }
-}
-
-async function findOrOpenTab(def: PlatformDef): Promise<number> {
-  const tabs = await tabsForPlatform(def);
-  // Only our own helper / session tabs; the user's tabs are never used (see TabPool.callCandidates).
-  const ready = pool.callCandidates(tabs);
-  // Tabs opened before the extension was (re)loaded have no live content script; skip them.
-  for (const t of ready.slice(0, 4)) {
-    const reachable = await waitContentReady(t.id!, 1_500).then(() => true, () => false);
-    remoteLog("info", "tab probe", { platform: def.id, tab: t.id, url: (t.url ?? "").slice(0, 60), reachable });
-    if (reachable) {
-      pool.touch(t.id!);
-      return t.id!;
-    }
-  }
-  // No usable tab: open one helper tab per platform in the work window (never in the user's
-  // window), reuse it for later in-tab calls, and let the idle sweep close it.
-  for (const [tabId, h] of [...pool.helperTabs]) {
-    if (h.platform === def.id) await pool.closeTab(tabId); // unreachable (stale build / discarded): replace it
-  }
-  log.info("opening tab for", def.id);
-  remoteLog("info", "opening helper tab", { platform: def.id, ready_tabs: ready.length, all_tabs: tabs.length });
-  const tab = await createInWorkWindow(def.homeUrl, false);
-  pool.addHelper(tab.id!, def.id);
-  const t0 = Date.now();
-  try {
-    await waitContentReady(tab.id!, 30_000);
-    remoteLog("info", "new tab ready", { platform: def.id, tab: tab.id, ms: Date.now() - t0 });
-  } catch (e) {
-    const info = await chrome.tabs.get(tab.id!).catch(() => null);
-    remoteLog("warning", "new tab never reachable", { platform: def.id, tab: tab.id, status: info?.status, url: (info?.url ?? "").slice(0, 80), discarded: info?.discarded });
-    throw e;
-  }
-  // Let the site's own scripts run briefly (device cookies, SSR state) but never block on a
-  // page that streams forever.
-  await Promise.race([waitTabNavigated(tab.id!, 5_000), new Promise((r) => setTimeout(r, 5_000))]);
-  return tab.id!;
-}
-
-// ---- work window ------------------------------------------------------------------------
-// Temporary tabs live in their own window so (1) the user's window is never touched and
-// (2) the active tab there is a *visible* document: IntersectionObserver-driven infinite
-// scroll and requestAnimationFrame do not run in hidden tabs. The window is created unfocused
-// and off to the side; Chrome may clamp the position onto the screen.
-
-let workWindowId: number | null = null;
-
-async function workWindowAlive(): Promise<number | null> {
-  if (workWindowId == null) return null;
-  const ok = await chrome.windows.get(workWindowId).then(() => true, () => false);
-  if (!ok) workWindowId = null;
-  return workWindowId;
-}
-
-// The window stays open between tasks: every fresh window Chrome creates lands on top of whatever
-// the user is doing, so it is created once, holds a pinned placeholder page (work.html) so closing
-// our last tab does not close it, and later tasks only add tabs, which does not raise the window.
-// Its bounds are remembered, so once moved aside (or to another screen) it stays there.
-const WORK_PAGE = chrome.runtime.getURL("work.html");
-type Bounds = { left: number; top: number; width: number; height: number };
-let boundsTimer: ReturnType<typeof setTimeout> | null = null;
-
-async function savedBounds(): Promise<Bounds | null> {
-  const s = await chrome.storage.local.get("workWindowBounds");
-  const b = s.workWindowBounds as Bounds | undefined;
-  return b && Number.isFinite(b.width) && b.width >= 400 ? b : null;
-}
-
-/** Open `url` in the work window, creating the window (unfocused, with the placeholder) when needed. */
-async function createInWorkWindow(url: string, active: boolean, index?: number): Promise<chrome.tabs.Tab> {
-  const windowId = await workWindowAlive();
-  if (windowId != null) {
-    await restoreWorkWindow();
-    return chrome.tabs.create({ windowId, url, active, ...(index != null ? { index } : {}) });
-  }
-  const bounds = await savedBounds();
-  // Explicit bounds can be rejected ("must be at least 50% within visible screen space") on
-  // small or scaled displays: fall back to Chrome's defaults, then try to resize.
-  const w = await chrome.windows.create({ url, focused: false, state: "normal", ...(bounds ?? {}) }).catch(() => chrome.windows.create({ url, focused: false, state: "normal" }));
-  workWindowId = w.id!;
-  if (!bounds) chrome.windows.update(workWindowId, { width: 1000, height: 800, left: 0, top: 0 }).catch(() => {});
-  const tab = w.tabs?.[0] ?? (await chrome.tabs.query({ windowId: workWindowId }))[0];
-  chrome.tabs.create({ windowId: workWindowId, url: WORK_PAGE, active: false, index: 0, pinned: true }).catch(() => {});
-  log.info("work window created", workWindowId);
-  return tab;
-}
-
-chrome.windows.onRemoved.addListener((id) => {
-  if (id === workWindowId) workWindowId = null;
-});
-chrome.windows.onBoundsChanged.addListener((w) => {
-  if (w.id !== workWindowId || w.state !== "normal" || !w.width || !w.height) return;
-  if (boundsTimer) clearTimeout(boundsTimer);
-  boundsTimer = setTimeout(() => {
-    void chrome.storage.local.set({ workWindowBounds: { left: w.left ?? 0, top: w.top ?? 0, width: w.width!, height: w.height! } });
-  }, 500);
-});
-
-async function openWorkTab(url: string, index?: number): Promise<chrome.tabs.Tab> {
-  return createInWorkWindow(url, true, index);
-}
-
-// ---- work window --------------------------------------------------------------------
-
-/** Bring the work window back when it was minimized: hidden tabs stop loading more. */
-async function restoreWorkWindow(): Promise<void> {
-  const windowId = await workWindowAlive();
-  if (windowId == null) return;
-  const w = await chrome.windows.get(windowId).catch(() => null);
-  if (w?.state === "minimized") await chrome.windows.update(windowId, { state: "normal", focused: false }).catch(() => {});
-}
-
-// ---- task execution ----------------------------------------------------------------
-
-function executeInTab(tabId: number, task: TaskSpec): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      if (pendingPage.delete(task.id)) {
-        remoteLog("warning", "page did not answer", { task_id: task.id, tab: tabId, action: task.action });
-        reject(new ExtError("timeout", `page did not answer within ${task.timeout_ms}ms`));
-      }
-    }, task.timeout_ms + 1000);
-    pendingPage.set(task.id, {
-      tabId,
-      resolve: (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      reject: (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    });
-    sendToTab(tabId, { type: "task.execute", task })
-      .then((res) => remoteLog("info", "task sent to page", { task_id: task.id, tab: tabId, action: task.action, doc: String(res?.doc ?? "").slice(0, 8) }))
-      .catch((e) => {
-        if (pendingPage.delete(task.id)) reject(new ExtError("extension_error", `cannot reach tab ${tabId}: ${String(e)}`));
-      });
-  });
-}
-
-async function executeTask(task: TaskSpec): Promise<unknown> {
-  if (task.platform === "_system") {
-    if (task.action === "cookies") {
-      // Dev: which cookies exist for a site (names + domains, never values) to pick a login marker.
-      const url = String(task.params.url ?? "");
-      const all = await chrome.cookies.getAll(url ? { url } : {});
-      return { url, cookies: all.map((c) => ({ name: c.name, domain: c.domain, http_only: c.httpOnly, expires: c.expirationDate ? new Date(c.expirationDate * 1000).toISOString() : null })) };
-    }
-    if (task.action !== "echo") throw new ExtError("unsupported", `unknown system action ${task.action}`);
-    const tabs = await chrome.tabs.query({});
-    return { echo: task.params.payload ?? null, via: "background", extension_version: VERSION, build: BUILD, open_tabs: tabs.length, work_window: workWindowId };
-  }
-  const def = platformById(task.platform);
-  if (!def) throw new ExtError("unknown_platform", `extension has no adapter for ${task.platform}`);
-  if (def.loginRequired !== false && !task.params.allow_anonymous && !(await isLoggedIn(def))) {
-    throw new ExtError("not_logged_in", `未登录${def.name}：${def.loginHint}`, { login_url: def.loginUrl, platform: def.id });
-  }
-  // Continue in a tab kept open by an earlier navigate (pagination by scrolling).
-  if (typeof task.params._tab === "number") {
-    const key = pool.resolveCursor(task.params._tab);
-    const alive = key && (await chrome.tabs.get(key.tabId).then(() => true, () => false));
-    if (!key || !alive) throw new ExtError("cursor_expired", "the tab behind this cursor is gone; start again without a cursor");
-    if (pool.busy.has(key.tabId)) throw new ExtError("extension_error", "the tab behind this cursor is loading another page; retry shortly");
-    pool.touch(key.tabId);
-    await chrome.tabs.update(key.tabId, { active: true }).catch(() => {}); // must be visible to load more
-    const curDoc = await waitContentReady(key.tabId, 5_000);
-    if (curDoc !== key.doc) {
-      throw new ExtError("cursor_expired", "the page behind this cursor was replaced by a later task in the same tab; start again without a cursor");
-    }
-    const value = await executeInTab(key.tabId, task);
-    return pool.withTab(value, task.params._tab);
-  }
-
-  if (cancelledTasks.delete(task.id)) throw new ExtError("cancelled", "cancelled");
-
-  if (task.strategy === "navigate" && typeof task.params.url === "string") {
-    // Tabs the extension owns in the work window: nothing the user is looking at gets navigated
-    // away, and pages with unload handlers cannot block us. Login is a cookie check, so no
-    // helper tab is needed before navigating.
-    let since = Date.now();
-    const deadline = since + task.timeout_ms - 1000;
-    const keepTab = !!task.params.keep_tab;
-    const shortUrl = String(task.params.url).slice(0, 80);
-    // A session tab already sitting on this URL (comments -> replies -> replies of one post) is
-    // reused instead of loading the page again: fewer page loads is what keeps risk control quiet.
-    // Its ring buffer still holds the earlier responses, so the action waits from time 0.
-    const reused = await pool.findSessionTab(def.id, task.params.url);
-    const reusable = reused == null ? await pool.findReusableTab(def.id, task.action, keepTab) : null;
-    let navTabId: number;
-    let ownTab = false;
-    if (reused != null) {
-      navTabId = reused;
-      since = 0;
-      pool.touch(navTabId);
-      await chrome.tabs.update(navTabId, { active: true }).catch(() => {});
-      remoteLog("info", "navigate: reusing session tab", { task_id: task.id, tab: navTabId, url: shortUrl });
-    } else {
-      // Replace an owned tab (the platform's home / previous search page) in place rather than
-      // piling up tabs: the user wants one page per platform. Chrome would not commit a
-      // tabs.update({url}) navigation of these tabs from this code path (the navigation stayed
-      // pending with the old document alive, in headless and headed Chromium alike, while the
-      // same call from the service worker console worked), so the tab is closed and a new one
-      // opened at its index. Cursors bound to the old tab expire with it.
-      let index: number | undefined;
-      if (reusable != null) {
-        const old = await chrome.tabs.get(reusable).catch(() => null);
-        index = old?.index;
-        await pool.closeTab(reusable);
-        remoteLog("info", "navigate: replacing owned tab", { task_id: task.id, tab: reusable, url: shortUrl });
-      } else {
-        remoteLog("info", "navigate: opening work tab", { task_id: task.id, url: shortUrl });
-      }
-      const navTab = await openWorkTab(task.params.url, index);
-      navTabId = navTab.id!;
-      ownTab = true;
-      remoteLog("info", "navigate: work tab created", { task_id: task.id, tab: navTabId, window: navTab.windowId, replaced: reusable ?? undefined });
-    }
-    pool.busy.add(navTabId);
-    try {
-      const doc = await waitContentReady(navTabId, Math.min(20_000, task.timeout_ms));
-      log.debug("navigate: document", doc.slice(0, 8), "reachable after", Date.now() - since, "ms in tab", navTabId);
-      if (keepTab && ownTab) {
-        pool.addSession(navTabId, def.id, task.action);
-        await pool.trimSessionTabs(def.id);
-      }
-      const pattern = task.params.capture_pattern;
-      const pageAction = typeof task.params.page_action === "string" ? task.params.page_action : undefined;
-      if (pageAction) {
-        // Run a page action in the navigated document instead of waiting for a capture.
-        // The action decides how long to wait (e.g. read_global with wait_ms). Sites with an
-        // interstitial ("Please wait..." bot checks, login bounces) replace the document after
-        // load, which would strand the action: re-issue it in the new document when that happens.
-        const pageParams = { ...((task.params.page_params as Record<string, unknown>) ?? {}), since };
-        const runId = (d: string, attempt: number) => (attempt === 0 ? task.id : `${task.id}:${d.slice(0, 8)}`);
-        const outcome = await runUntilSettled(doc, {
-          deadline,
-          run: (d, attempt) => executeInTab(navTabId, { ...task, id: runId(d, attempt), action: pageAction, params: pageParams }),
-          // The replacement watch times out at the deadline: that is the action timing out, not a navigation problem.
-          watchReplaced: (d, remaining) => waitContentReady(navTabId, remaining, d),
-          cancel: (d, attempt) => {
-            pendingPage.delete(runId(d, attempt));
-            sendToTab(navTabId, { type: "task.cancel", id: runId(d, attempt) }).catch(() => {});
-          },
-          onReplaced: (d, attempt) => remoteLog("info", "navigate: document replaced, re-running page action", { task_id: task.id, tab: navTabId, doc: d.slice(0, 8), attempt }),
-        });
-        if ("value" in outcome) return pool.withTab(outcome.value, keepTab ? pool.cursorKeyFor(navTabId, outcome.doc) : undefined);
-        throw new ExtError("timeout", `page action ${pageAction} did not finish before the navigation settled`);
-      }
-      if (typeof pattern !== "string") {
-        return pool.withTab({ navigated: task.params.url }, keepTab ? pool.cursorKeyFor(navTabId, doc) : undefined);
-      }
-      // A site may chain documents (redirects, interstitials). Wait in the current document, but
-      // if it gets replaced before a match arrives, re-issue the wait in the new one.
-      const waitId = (d: string) => `${task.id}:${d.slice(0, 8)}`;
-      const outcome = await runUntilSettled(doc, {
-        deadline,
-        run: (d) => executeInTab(navTabId, { ...task, id: waitId(d), action: "wait_capture", params: { pattern, since, timeout_ms: deadline - Date.now() } }),
-        watchReplaced: (d, remaining) => waitContentReady(navTabId, remaining, d),
-        cancel: (d) => {
-          pendingPage.delete(waitId(d));
-          sendToTab(navTabId, { type: "task.cancel", id: waitId(d) }).catch(() => {});
-        },
-        onReplaced: (d) => log.debug("navigate: document replaced, re-waiting in", d.slice(0, 8)),
-      });
-      if ("value" in outcome) return pool.withTab(outcome.value, keepTab ? pool.cursorKeyFor(navTabId, outcome.doc) : undefined);
-      throw new ExtError("timeout", `no captured response matching ${pattern} before the navigation settled`);
-    } finally {
-      pool.busy.delete(navTabId);
-      if (!keepTab && ownTab) await pool.closeTab(navTabId);
-    }
-  }
-  const tabId = await findOrOpenTab(def);
-  log.debug("task", task.id, "using tab", tabId);
-  if (cancelledTasks.delete(task.id)) throw new ExtError("cancelled", "cancelled");
-  return executeInTab(tabId, task);
-}
-
-async function runTask(task: TaskSpec): Promise<void> {
-  const started = Date.now();
-  log.debug("task", task.id, task.platform, task.action);
-  try {
-    const payload = await executeTask(task);
-    if (cancelledTasks.delete(task.id)) return;
-    wsSend({ type: "task.result", id: task.id, ok: true, payload });
-  } catch (e) {
-    cancelledTasks.delete(task.id);
-    const err = toError(e);
-    log.warn("task failed", task.id, err.code, err.message);
-    wsSend({ type: "task.result", id: task.id, ok: false, error: err });
-  } finally {
-    remoteLog("debug", "task finished in extension", { task_id: task.id, elapsed_ms: Date.now() - started });
-  }
-}
+onBackendMessage(handleBackend);
+onBackendClosed(rejectAllPending);
 
 // ---- messages from content scripts and popup -----------------------------------------
 
@@ -639,11 +64,7 @@ chrome.runtime.onMessage.addListener((msg: ContentToBg | PopupToBg, sender, send
         remoteLog("info", "ignored result from another page build", { task_id: msg.id, build: msg.build ?? "none", expected: BUILD });
         return false;
       }
-      const p = pendingPage.get(msg.id);
-      if (p) {
-        pendingPage.delete(msg.id);
-        msg.ok ? p.resolve(msg.payload) : p.reject(new ExtError(msg.error?.code ?? "extension_error", msg.error?.message ?? "page error", msg.error?.details));
-      }
+      settlePageResult(msg.id, msg.ok, msg.payload, msg.error);
       return false;
     }
     case "page.capture": {
@@ -663,21 +84,14 @@ chrome.runtime.onMessage.addListener((msg: ContentToBg | PopupToBg, sender, send
     case "popup.save":
       void chrome.storage.local
         .set({ backendUrl: msg.backendUrl || DEFAULT_BACKEND, token: msg.token })
-        .then(() => {
-          if (ws) ws.close(1000, "config changed");
-          reconnectDelay = 1000;
-          return connect();
-        })
+        .then(() => reconnectNow("config changed"))
         .then(() => sendResponse({ ok: true }));
       return true;
     case "popup.reconnect":
-      reconnectDelay = 1000;
-      if (ws) ws.close(1000, "manual reconnect");
-      void connect().then(() => sendResponse({ ok: true }));
+      void reconnectNow("manual reconnect").then(() => sendResponse({ ok: true }));
       return true;
     case "popup.resume": {
-      const cfg = currentConfig;
-      const base = httpBase(cfg?.backendUrl ?? DEFAULT_BACKEND);
+      const base = httpBase(linkState().config?.backendUrl ?? DEFAULT_BACKEND);
       void fetch(`${base}/api/v1/${msg.platform}/resume`, { method: "POST" })
         .then((r) => sendResponse({ ok: r.ok }))
         .catch((e) => sendResponse({ ok: false, error: String(e) }));
@@ -692,8 +106,11 @@ chrome.tabs.onRemoved.addListener((id) => {
   pool.forget(id);
 });
 
+// ---- status (popup, dev hook) -------------------------------------------------------------
+
 async function buildStatus(): Promise<ExtStatus> {
-  const cfg = currentConfig ?? (await loadConfig());
+  const link = linkState();
+  const cfg = link.config ?? (await loadConfig());
   const platformStates: ExtStatus["platforms"] = {};
   for (const def of platforms) {
     const tabs = await tabsForPlatform(def);
@@ -710,7 +127,7 @@ async function buildStatus(): Promise<ExtStatus> {
   }
   // Paused queues come from the backend's status route (the extension only sees its own tasks).
   let alerts: ExtStatus["alerts"] = [];
-  if (connected) {
+  if (link.connected) {
     try {
       const res = await fetch(httpBase(cfg.backendUrl) + "/api/v1/status");
       const body = (await res.json()) as { data?: { queues?: Record<string, { paused_for_s?: number }> } };
@@ -722,45 +139,31 @@ async function buildStatus(): Promise<ExtStatus> {
     }
   }
   return {
-    connected,
+    connected: link.connected,
     backendUrl: cfg.backendUrl,
     hasToken: !!cfg.token,
-    backendVersion,
-    lastError,
+    backendVersion: link.backendVersion,
+    lastError: link.lastError,
     platforms: platformStates,
-    pendingTasks: pendingPage.size,
+    pendingTasks: pendingCount(),
     currentTab,
     alerts,
     build: BUILD,
   };
 }
 
-/** ws://host:port/ws/extension -> http://host:port */
-function httpBase(wsUrl: string): string {
-  try {
-    const u = new URL(wsUrl);
-    return `${u.protocol === "wss:" ? "https" : "http"}://${u.host}`;
-  } catch {
-    return "http://127.0.0.1:17800";
-  }
-}
-
 // ---- lifecycle -----------------------------------------------------------------------
 
 // Dev hook used by scripts/e2e_chrome.py after seeding chrome.storage; harmless otherwise.
 (self as unknown as { __sociallens: unknown }).__sociallens = {
-  reconnect: () => {
-    reconnectDelay = 1000;
-    if (ws) ws.close(1000, "dev reconnect");
-    return connect();
-  },
+  reconnect: () => reconnectNow("dev reconnect"),
   status: buildStatus,
 };
 
 chrome.alarms.create(ALARM, { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name !== ALARM) return;
-  if (!connected) void connect();
+  if (!linkState().connected) void connect();
   void pool.gcSessionTabs();
 });
 chrome.runtime.onStartup.addListener(() => void connect());
