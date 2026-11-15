@@ -100,6 +100,16 @@ export class TabPool {
     return this.closing.has(tabId);
   }
 
+  /** Tabs an in-tab call may run in, best first. Only tabs the extension owns (helper or
+   *  session tabs in the work window): the user's own tabs are never used, even in the
+   *  background, so a captcha a call provokes cannot land on the page they are reading.
+   *  Idle tabs before ones with a navigate in flight, then the most recently used. */
+  callCandidates<T extends { id?: number; status?: string; discarded?: boolean; lastAccessed?: number }>(tabs: T[]): T[] {
+    return tabs
+      .filter((t) => t.id != null && this.owns(t.id) && !this.closing.has(t.id) && t.status === "complete" && !t.discarded)
+      .sort((a, b) => Number(this.busy.has(a.id!)) - Number(this.busy.has(b.id!)) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+  }
+
   /** Close a tab we own (or borrowed); it stays excluded from lookups until Chrome confirms. */
   closeTab(tabId: number): Promise<void> {
     this.closing.add(tabId);

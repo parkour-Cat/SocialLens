@@ -178,3 +178,33 @@ describe("cursor keys", () => {
     expect(pool.resolveCursor(old)?.doc).toBe("doc-a"); // != the tab's current document -> cursor_expired
   });
 });
+
+describe("callCandidates", () => {
+  const tab = (id: number, extra: Record<string, unknown> = {}) => ({ id, status: "complete", discarded: false, lastAccessed: 0, ...extra });
+
+  it("never offers the user's own tabs, even the one they are looking at", () => {
+    const { pool } = fake();
+    expect(pool.callCandidates([tab(1, { active: true, lastAccessed: 99 }), tab(2)])).toEqual([]);
+    pool.addHelper(3, "bilibili");
+    expect(pool.callCandidates([tab(1, { active: true, lastAccessed: 99 }), tab(3)]).map((t) => t.id)).toEqual([3]);
+  });
+
+  it("puts idle tabs before busy ones, then the most recently used", () => {
+    const { pool } = fake();
+    pool.addHelper(1, "bilibili");
+    pool.addSession(2, "bilibili", "search_posts");
+    pool.addSession(3, "bilibili", "get_comments");
+    pool.busy.add(3);
+    const out = pool.callCandidates([tab(1, { lastAccessed: 10 }), tab(2, { lastAccessed: 20 }), tab(3, { lastAccessed: 30 })]);
+    expect(out.map((t) => t.id)).toEqual([2, 1, 3]);
+  });
+
+  it("skips tabs that are loading, discarded or being closed", async () => {
+    const { pool } = fake();
+    for (const id of [1, 2, 3, 4]) pool.addHelper(id, "bilibili");
+    await pool.closeTab(4);
+    pool.addHelper(4, "bilibili"); // re-registered while Chrome has not confirmed the removal
+    const out = pool.callCandidates([tab(1, { status: "loading" }), tab(2, { discarded: true }), tab(3), tab(4)]);
+    expect(out.map((t) => t.id)).toEqual([3]);
+  });
+});

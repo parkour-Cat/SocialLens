@@ -26,7 +26,7 @@ A Chrome extension intercepts and executes each site's own requests inside your 
 - **Two strategies.** `call` runs the site's API inside the tab (Bilibili, Reddit and other sites whose requests are unsigned or reproducible). `navigate` opens a page and only captures what the site requests by itself (Xiaohongshu, Douyin, Instagram and other sites with non-reproducible signatures); paging scrolls or clicks in the same tab.
 - **One data model.** Everything becomes `SocialPost`, `SocialUser`, `SocialComment`, `MediaItem`. Fields a platform lacks are null; the platform's own fields stay in `raw`.
 - **Per-platform rate limits.** One queue per platform with a jittered interval plus a "no more than N fresh page loads per 10 minutes" budget. Over budget, tasks wait in the queue instead of failing.
-- **Your tabs are left alone.** Pages the extension opens live in a separate work window, at most three per platform, reclaimed after five idle minutes. Your own tabs are read but never closed. The work window stays open once created (a small note page keeps it alive), so later tasks only add tabs and never pop it up again; shrink it or move it to another screen, the position is remembered. Don't minimize it or cover it completely: some platforms page only while the page is visible.
+- **Your tabs are left alone.** Pages the extension opens live in a separate work window, at most three per platform, reclaimed after five idle minutes. Every task runs in that window only: your own tabs, even open ones on the same platform, are never used to send requests, never navigated, scrolled or closed, so a captcha a task provokes does not land on the page you are reading. The work window stays open once created (a small note page keeps it alive), so later tasks only add tabs and never pop it up again; shrink it or move it to another screen, the position is remembered. Don't minimize it or cover it completely: some platforms page only while the page is visible.
 
 ## What each platform supports
 
@@ -205,7 +205,7 @@ The backend prunes by its retention policy every 24 hours (`SOCIALLENS_PRUNE_INT
 - Web pages cannot call the local API: the Host header must be `127.0.0.1` / `localhost` / `[::1]` (blocks DNS rebinding), and under `/api/` browser requests are let through only from the console itself and the extension. Requests started by any other site (a foreign Origin, or `Sec-Fetch-Site` of cross-site / same-site) get 403. curl, MCP and scripts send neither header and are unaffected. To reach the backend under another hostname on purpose, set `SOCIALLENS_ALLOWED_HOSTS=name1,name2`.
 - No captcha solving, no risk-control evasion, no login automation.
 - Ordinary browsing is not recorded; the interception layer only handles traffic triggered by API tasks.
-- Pages the extension opens live in a separate work window; the user's own tabs are never closed.
+- Tasks run only in pages the extension opens in its own work window; the user's own tabs are never used for tasks, navigated or closed.
 
 ## Development
 

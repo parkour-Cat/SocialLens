@@ -329,10 +329,8 @@ async function pushCaptureConfig(platformId: string): Promise<void> {
 
 async function findOrOpenTab(def: PlatformDef): Promise<number> {
   const tabs = await tabsForPlatform(def);
-  const ready = tabs.filter((t) => t.status === "complete" && !t.discarded);
-  const ours = (id: number) => pool.owns(id);
-  // Our own helper / session tabs first (keeps the user's tabs untouched), then the user's, most recent first.
-  ready.sort((a, b) => Number(ours(b.id!)) - Number(ours(a.id!)) || Number(b.active) - Number(a.active) || (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0));
+  // Only our own helper / session tabs; the user's tabs are never used (see TabPool.callCandidates).
+  const ready = pool.callCandidates(tabs);
   // Tabs opened before the extension was (re)loaded have no live content script; skip them.
   for (const t of ready.slice(0, 4)) {
     const reachable = await waitContentReady(t.id!, 1_500).then(() => true, () => false);
