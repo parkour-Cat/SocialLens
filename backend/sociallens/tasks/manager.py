@@ -205,8 +205,8 @@ class TaskManager:
     def get(self, task_id: str) -> Task | None:
         return self._tasks.get(task_id) or self.db.get_task(task_id)
 
-    def list(self, platform: str | None, status: str | None, limit: int = 100) -> list[Task]:
-        return self.db.list_tasks(platform, status, limit)
+    def list(self, platform: str | None, status: str | None, limit: int = 100, action: str | None = None, trim: bool = False) -> list[Task]:
+        return self.db.list_tasks(platform, status, limit, action=action, trim=trim)
 
     async def submit(self, platform: str, action: str, params: dict[str, Any], timeout_s: float | None = None, parse: bool = True) -> Task:
         adapter = self.registry.get(platform)

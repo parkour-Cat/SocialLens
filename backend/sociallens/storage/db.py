@@ -66,6 +66,10 @@ CREATE INDEX IF NOT EXISTS idx_snapshots_item ON item_snapshots(kind, platform, 
 """
 
 
+# Heavy parts of a task result that list views leave out (see list_tasks).
+TRIM_PATHS = ("$.result.items", "$.result.raw")
+
+
 class Database:
     def __init__(self, path: Path):
         self.path = path
@@ -99,21 +103,29 @@ class Database:
         row = self.conn.execute("SELECT body FROM tasks WHERE id=?", (task_id,)).fetchone()
         return Task.model_validate_json(row["body"]) if row else None
 
-    def list_tasks(self, platform: str | None = None, status: str | None = None, limit: int = 100) -> list[Task]:
-        sql = "SELECT body FROM tasks"
+    def list_tasks(self, platform: str | None = None, status: str | None = None, limit: int = 100, action: str | None = None, trim: bool = False) -> list[Task]:
+        """Newest first. trim=True drops result.items and result.raw inside SQLite (they are ~90% of
+        a task's size and lists only show progress) and puts their count in result.item_count."""
+        if trim:
+            sql = f"SELECT json_remove(body, {', '.join(repr(p) for p in TRIM_PATHS)}) AS body, json_array_length(body, '$.result.items') AS n FROM tasks"
+        else:
+            sql = "SELECT body, NULL AS n FROM tasks"
         clauses, args = [], []
-        if platform:
-            clauses.append("platform=?")
-            args.append(platform)
-        if status:
-            clauses.append("status=?")
-            args.append(status)
+        for col, val in (("platform", platform), ("status", status), ("action", action)):
+            if val:
+                clauses.append(f"{col}=?")
+                args.append(val)
         if clauses:
             sql += " WHERE " + " AND ".join(clauses)
         sql += " ORDER BY created_at DESC LIMIT ?"
         args.append(limit)
-        rows = self.conn.execute(sql, args).fetchall()
-        return [Task.model_validate_json(r["body"]) for r in rows]
+        out = []
+        for r in self.conn.execute(sql, args).fetchall():
+            t = Task.model_validate_json(r["body"])
+            if r["n"] is not None and isinstance(t.result, dict):
+                t.result["item_count"] = r["n"]
+            out.append(t)
+        return out
 
     def count_tasks(self, platform: str, status: str) -> int:
         row = self.conn.execute(

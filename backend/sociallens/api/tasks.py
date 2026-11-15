@@ -42,13 +42,13 @@ async def list_tasks(
     status: str | None = Query(default=None),
     action: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=500),
+    full: bool = Query(default=False),
 ):
-    """Recent tasks, newest first; filter by platform, status, action (collect / download / ...)."""
+    """Recent tasks, newest first; filter by platform, status, action (collect / download / ...).
+    Results come without `items` / `raw` (their count is in result.item_count) unless full=true;
+    GET /tasks/{id} always returns the whole task."""
     st = state(request)
-    tasks = st.tasks.list(platform, status, 500 if action else limit)
-    if action:
-        tasks = [t for t in tasks if t.action == action][:limit]
-    return ok([t.public() for t in tasks])
+    return ok([t.public() for t in st.tasks.list(platform, status, limit, action=action, trim=not full)])
 
 
 @router.get("/tasks/{task_id}")

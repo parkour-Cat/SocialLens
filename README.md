@@ -138,6 +138,7 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 | POST | `/api/v1/{platform}/collect` | 连续拉取：后台自动翻页到 `limit` 条，去重合并 |
 | POST | `/api/v1/{platform}/posts/{id}/download` | 下载帖子的全部媒体到 `data/downloads/` |
 | GET | `/api/v1/tasks/{id}` | 任务状态、结果、进度 |
+| GET | `/api/v1/tasks?platform=&status=&action=&full=` | 任务列表；结果里默认不带 `items` 和 `raw`（条数在 `result.item_count`），`full=true` 才带 |
 | POST | `/api/v1/{platform}/resume` | 清除风控导致的队列暂停 |
 | GET | `/api/v1/items?kind=&platform=` | 浏览本地缓存 |
 | GET | `/api/v1/storage` | 各类数据的占用和保留策略 |

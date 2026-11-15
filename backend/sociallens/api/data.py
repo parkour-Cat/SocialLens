@@ -220,8 +220,9 @@ async def collect(request: Request, platform: str, body: CollectBody):
 
 
 @router.get("/collects")
-async def list_collects(request: Request, platform: str | None = None, limit: int = 50):
-    """Recent multi-page collect tasks with count, pages and stop reason."""
+async def list_collects(request: Request, platform: str | None = None, limit: int = 50, full: bool = False):
+    """Recent multi-page collect tasks with count, pages and stop reason. The collected items are
+    left out (result.item_count) unless full=true; GET /tasks/{id} returns one collect with them."""
     st = state(request)
-    return ok([t.public() for t in st.collects.list(platform, limit)])
+    return ok([t.public() for t in st.collects.list(platform, limit, trim=not full)])
 

@@ -144,8 +144,8 @@ class DownloadManager:
         await self.tasks.wait(task.id, timeout_s)
         return task
 
-    def list(self, platform: str | None, limit: int) -> list[Task]:
-        return [t for t in self.tasks.list(platform, None, 500) if t.action == "download"][:limit]
+    def list(self, platform: str | None, limit: int, trim: bool = False) -> list[Task]:
+        return self.tasks.list(platform, None, limit, action="download", trim=trim)
 
     # ---- pipeline ------------------------------------------------------------------
 

@@ -66,8 +66,8 @@ class CollectManager:
         await self.tasks.wait(task.id, timeout_s)
         return task
 
-    def list(self, platform: str | None, limit: int) -> list[Task]:
-        return [t for t in self.tasks.list(platform, None, 500) if t.action == "collect"][:limit]
+    def list(self, platform: str | None, limit: int, trim: bool = False) -> list[Task]:
+        return self.tasks.list(platform, None, limit, action="collect", trim=trim)
 
     async def _cancel(self, task_id: str) -> None:
         t = self._running.get(task_id)

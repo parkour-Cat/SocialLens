@@ -138,6 +138,7 @@ Every response is `{"success": true, "data": ...}` or `{"success": false, "error
 | POST | `/api/v1/{platform}/collect` | collect: page in the background up to `limit` items, deduplicated |
 | POST | `/api/v1/{platform}/posts/{id}/download` | download a post's media into `data/downloads/` |
 | GET | `/api/v1/tasks/{id}` | task state, result, progress |
+| GET | `/api/v1/tasks?platform=&status=&action=&full=` | task list; results leave out `items` and `raw` by default (their count is in `result.item_count`), `full=true` keeps them |
 | POST | `/api/v1/{platform}/resume` | clear a pause caused by risk control |
 | GET | `/api/v1/items?kind=&platform=` | browse the local cache |
 | GET | `/api/v1/storage` | disk usage per kind of data, and the retention policy |
