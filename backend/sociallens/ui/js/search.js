@@ -1,7 +1,7 @@
 // 搜索 page: one command bar for single-platform actions (every capability) and multi-platform search
 // (cmd/ctrl+click a second chip). Every run pushes a #/search?… entry; results are cached per entry
 // (memory + sessionStorage) so back / forward / reload restore them without hitting the site again.
-import { actCtx, $, esc, J, fmtN, fmtT, api, toast, on, act, S, store, plat, pname, logo, pcolor, capsOf, loggedOut, ACTIONS, LIST_ACTIONS, ORDERS, actionName, itemKind, hashFor, exportJSON, exportCSV, IC } from "./core.js";
+import { actCtx, $, esc, J, fmtN, fmtT, api, toast, on, act, S, store, plat, pname, logo, pcolor, capsOf, loggedOut, ACTIONS, LIST_ACTIONS, ORDERS, actionName, itemKind, hashFor, exportJSON, exportCSV, exportXLSX, IC } from "./core.js";
 import { renderList, viewOf, viewSeg, setView, skeleton } from "./results.js";
 import { openItem, close as closeDrawer } from "./drawer.js";
 
@@ -97,7 +97,7 @@ function resultHead(s) {
   const ctx = `${logo(s.pid)}<b>${esc(pname(s.pid))}</b><span class="faint">·</span><span>${esc(actionName(s.action))}</span>${s.key ? `<span class="faint">·</span><span class="mono strong ell">${esc(s.key)}</span>` : ""}`;
   const count = `${s.items.length} 条${s.total ? "，共约 " + fmtN(s.total) : ""}${s.collect ? "" : s.cursor ? "，可翻页" : "，没有更多"}`;
   const meta = [count, s.secs ? `${s.secs} 秒` : "", s.source || "", s.at ? `查询于 ${fmtT(new Date(s.at).toISOString())}` : ""].filter(Boolean).map((x) => `<span>${esc(x)}</span>`).join(`<span class="faint">·</span>`);
-  return `<div class="rh">${ctx}<span class="rmeta faint">${meta}</span><span class="sp"></span>${viewSeg(s.pid, s.kind)}<button class="btn ghost sm" data-act="export" data-arg='"json"'>导出 JSON</button><button class="btn ghost sm" data-act="export" data-arg='"csv"'>导出 CSV</button>${s.cursor ? `<button class="btn sm" data-act="next" ${loading ? "disabled" : ""}>下一页</button>` : ""}</div>`;
+  return `<div class="rh">${ctx}<span class="rmeta faint">${meta}</span><span class="sp"></span>${viewSeg(s.pid, s.kind)}<button class="btn ghost sm" data-act="export" data-arg='"json"'>导出 JSON</button><button class="btn ghost sm" data-act="export" data-arg='"csv"'>导出 CSV</button><button class="btn ghost sm" data-act="export" data-arg='"xlsx"'>导出 Excel</button>${s.cursor ? `<button class="btn sm" data-act="next" ${loading ? "disabled" : ""}>下一页</button>` : ""}</div>`;
 }
 function results() {
   if (loading && !R?.single?.items?.length && !loading.multi) return `<section class="res"><div class="rh"><span class="spin"></span><span>${esc(loading.text)}</span></div>${skeleton()}</section>`;
@@ -154,7 +154,7 @@ on("mtype", (t) => { F.mtype = t; saveForm(); render(); });
 on("order", (v) => { F.order = v; saveForm(); render(); });
 on("mode", (m) => { if (actCtx().event?.target.id === "f-limit") return; F.mode = m; saveForm(); render(); if (m === "collect") $("f-limit")?.select(); });
 on("view", (pid, kind, v) => { setView(pid, kind, v); renderResults(); });
-on("export", (fmt) => { const items = R?.single?.items || R?.multi?.results.flatMap((e) => e.items) || []; (fmt === "csv" ? exportCSV : exportJSON)(items, "sociallens"); });
+on("export", (fmt) => { const items = R?.single?.items || R?.multi?.results.flatMap((e) => e.items) || []; ({ csv: exportCSV, xlsx: exportXLSX }[fmt] || exportJSON)(items, "sociallens"); });
 on("run", () => run());
 on("next", () => runQuery(true));
 

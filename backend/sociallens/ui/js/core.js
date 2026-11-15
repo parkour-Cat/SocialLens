@@ -128,6 +128,16 @@ export function exportCSV(items, name) {
   const cell = (v) => { const s = v == null ? "" : String(v); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
   saveBlob(`${name}-${Date.now()}.csv`, "﻿" + [cols.join(","), ...rows.map((r) => cols.map((c) => cell(r[c])).join(","))].join("\r\n"), "text/csv;charset=utf-8");
 }
+// Excel parses long digit strings in a CSV as numbers (19-digit ids become 2.09E+18 and lose
+// digits); the backend writes a real .xlsx where ids stay text and counts stay numbers.
+export async function exportXLSX(items, name) {
+  if (!items?.length) return toast("没有数据可导出", true);
+  try {
+    const res = await fetch(API + "/export/xlsx", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: `${name}-${Date.now()}`, rows: items.map(flat) }) });
+    if (!res.ok) { let m = res.status; try { m = (await res.json()).error?.message || m; } catch {} return toast(`导出失败：${m}`, true); }
+    saveBlob(`${name}-${Date.now()}.xlsx`, await res.blob(), res.headers.get("content-type"));
+  } catch (e) { toast(e.message, true); }
+}
 export function copyText(t) { navigator.clipboard.writeText(t).then(() => toast("已复制"), () => toast("复制失败", true)); }
 on("copy", (t) => copyText(t));
 

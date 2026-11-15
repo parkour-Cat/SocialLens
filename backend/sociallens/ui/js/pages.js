@@ -1,5 +1,5 @@
 // 数据 (query history + local cache) and 任务 (collects, downloads, page tasks) pages.
-import { $, esc, J, fmtN, fmtT, fmtB, api, toast, on, act, S, store, plat, pname, logo, actionName, statusPill, taskSummary, isDebugTask, isActive, go, hashFor, exportJSON, exportCSV, IC } from "./core.js";
+import { $, esc, J, fmtN, fmtT, fmtB, api, toast, on, act, S, store, plat, pname, logo, actionName, statusPill, taskSummary, isDebugTask, isActive, go, hashFor, exportJSON, exportCSV, exportXLSX, IC } from "./core.js";
 import { renderList, viewOf, viewSeg, setView } from "./results.js";
 import { Z } from "./i18n.js";
 
@@ -44,12 +44,12 @@ async function loadData() {
       else { const q = new URLSearchParams({ kind: DK.k, limit: String(DK.n) }); if (DK.p) q.set("platform", DK.p); dItems = (await api("/items?" + q)).data; }
       const pid = DK.p || src?.platform || null;
       const what = src ? `${dItems.length} 条 · 来自 ${fmtT(src.at)} 的${actionName(src.action)}${src.key ? "「" + src.key + "」" : ""}，按当时的顺序` : `${dItems.length} 条 · 按最近更新排序`;
-      out.innerHTML = `<section class="res"><div class="rh"><b>${{ posts: "帖子", users: "用户", comments: "评论" }[DK.k]}</b><span class="faint">${esc(what)}</span><span class="sp"></span>${viewSeg(pid, DK.k, "dView")}<button class="btn ghost sm" data-act="dExport" data-arg='"json"'>导出 JSON</button><button class="btn ghost sm" data-act="dExport" data-arg='"csv"'>导出 CSV</button></div>${renderList(dItems, DK.k, pid, viewOf(pid, DK.k), { showPlatform: !pid })}</section>`;
+      out.innerHTML = `<section class="res"><div class="rh"><b>${{ posts: "帖子", users: "用户", comments: "评论" }[DK.k]}</b><span class="faint">${esc(what)}</span><span class="sp"></span>${viewSeg(pid, DK.k, "dView")}<button class="btn ghost sm" data-act="dExport" data-arg='"json"'>导出 JSON</button><button class="btn ghost sm" data-act="dExport" data-arg='"csv"'>导出 CSV</button><button class="btn ghost sm" data-act="dExport" data-arg='"xlsx"'>导出 Excel</button></div>${renderList(dItems, DK.k, pid, viewOf(pid, DK.k), { showPlatform: !pid })}</section>`;
     }
   } catch (e) { out.innerHTML = `<section class="res"><div class="banner bad">${esc(e.message)}</div></section>`; }
 }
 on("dView", (pid, kind, v) => { setView(pid, kind, v); loadData(); });
-on("dExport", (f) => (f === "csv" ? exportCSV : exportJSON)(dItems, "cache"));
+on("dExport", (f) => ({ csv: exportCSV, xlsx: exportXLSX }[f] || exportJSON)(dItems, "cache"));
 on("dOpen", async (id) => {
   try { const q = (await api(`/queries/${id}`)).data; act("showResult", { pid: q.platform, action: q.action, params: q.params || {}, items: q.items, kind: q.kind, source: `历史 #${q.id}`, at: Date.parse(q.at) }); }
   catch (e) { toast(e.message, true); }

@@ -1,12 +1,13 @@
 from fastapi import APIRouter
 
-from . import data, health, history, internal, items, meta, platforms, resolve, storage, system, tasks
+from . import data, export, health, history, internal, items, meta, platforms, resolve, storage, system, tasks
 
 router = APIRouter(prefix="/api/v1")
 # Fixed-path routers first: platforms.router has /{platform}/... catch-alls.
 router.include_router(system.router)
 router.include_router(health.router)
 router.include_router(storage.router)
+router.include_router(export.router)
 router.include_router(tasks.router)
 router.include_router(internal.router)
 router.include_router(items.router)

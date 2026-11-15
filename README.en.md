@@ -123,7 +123,7 @@ Open http://127.0.0.1:17800/ once the backend runs. Static files and native ES m
 
 - **Search**: one command bar for platform, action and parameters, in "one page" or "up to N items" mode; cmd / ctrl + click a platform to search several at once, with results grouped per platform. Pasted post or user links are resolved. Results switch between a table and cards (image-first sites such as Xiaohongshu and Douyin default to cards); comments render as threads. Keys: `/` focus the input, `j` `k` move, `o` open, `t` table / cards.
 - **Detail drawer**: laid out per content type (video, image carousel, long article, tweet card); links, @mentions and #topics in the text are clickable. Tabs for comments, the author's profile and posts, metric history, media downloads and raw JSON; expands to a full page. Platforms that can fetch the full detail without opening a page do so automatically; the ones that need a page load wait for a click, to save the page-load budget.
-- **Data**: query history and the local cache (posts, users, comments), browsable by platform and exportable as JSON / CSV; any past query reopens in one click. The Storage tab shows how much space each kind of data takes, and prunes by the policy or clears one kind on demand.
+- **Data**: query history and the local cache (posts, users, comments), browsable by platform and exportable as JSON / CSV / Excel (pick Excel for Excel: it turns long numeric ids in a CSV into scientific notation and drops their last digits); any past query reopens in one click. The Storage tab shows how much space each kind of data takes, and prunes by the policy or clears one kind on demand.
 - **Tasks**: collects, downloads and other tasks in one list, grouped as running / finished / failed, with progress and cancel; new downloads start here.
 - **Status**: alerts first (paused queues with one-click resume, failing probes, extension offline), then one tile per platform with login state, page-load budget and probe result, then the risk-control log.
 - **API**: the capability matrix (hover a platform icon for its notes), the REST list generated from OpenAPI with curl examples (GET endpoints can be tried in place), and the MCP tool list with the connect command.
@@ -159,6 +159,7 @@ Every response is `{"success": true, "data": ...}` or `{"success": false, "error
 | POST | `/api/v1/{platform}/resume` | clear a pause caused by risk control |
 | GET | `/api/v1/items?kind=&platform=` | browse the local cache |
 | GET | `/api/v1/storage` | disk usage per kind of data, and the retention policy |
+| POST | `/api/v1/export/xlsx` | `{"rows": [...], "name": "file name"}` to an .xlsx: strings (ids included) stay text, numbers stay numbers |
 | POST | `/api/v1/storage/prune` | prune old data: no body applies the retention policy; `{"older_than_days": {"items": 90}}` picks targets and days, 0 means everything |
 
 ```bash
