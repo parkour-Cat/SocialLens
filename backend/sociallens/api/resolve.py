@@ -1,18 +1,20 @@
 """Turn whatever the user pastes (a post / profile link, a bare id, or plain words) into
 {platform, kind, id, xsec_token} so the console can jump straight to the right action.
 
-Short links (b23.tv, v.douyin.com, xhslink.com, v.kuaishou.com) are recognised by platform only:
-resolving them needs a request, which the console does by opening the page through the extension.
+Short links (b23.tv, v.douyin.com, xhslink.com, v.kuaishou.com ...) are what the apps' share
+buttons produce. resolve() recognises them by platform only; resolve_link() follows their
+redirects (expand_short_link) to the full URL and resolves that.
 """
 
 from __future__ import annotations
 
 import re
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
-from fastapi import APIRouter, Query
+import httpx
+from fastapi import APIRouter, Query, Request
 
-from .deps import ok
+from .deps import ok, state
 
 router = APIRouter(tags=["resolve"])
 
@@ -179,7 +181,53 @@ def resolve(text: str) -> dict:
     return out
 
 
+MAX_HOPS = 5
+REDIRECTS = (301, 302, 303, 307, 308)
+UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+
+
+async def expand_short_link(url: str, proxy: str | None = None, transport: httpx.AsyncBaseTransport | None = None) -> str | None:
+    """Follow a share short link to the full URL it points at, or None.
+
+    Only hosts in SHORT_HOSTS are ever requested, only the redirect's Location is read, and no
+    cookies are sent: this is not a way to fetch arbitrary pages. Stops at the first non-short
+    host (that URL is the answer) or after MAX_HOPS."""
+    cur = url
+    async with httpx.AsyncClient(follow_redirects=False, timeout=10.0, proxy=proxy, transport=transport, headers={"user-agent": UA}) as client:
+        for _ in range(MAX_HOPS):
+            if (urlparse(cur).hostname or "").lower() not in SHORT_HOSTS:
+                return cur
+            try:
+                res = await client.get(cur)
+            except httpx.HTTPError:
+                return None
+            loc = res.headers.get("location")
+            if res.status_code not in REDIRECTS or not loc:
+                return None
+            cur = urljoin(cur, loc)
+    return None if (urlparse(cur).hostname or "").lower() in SHORT_HOSTS else cur
+
+
+async def resolve_link(text: str, proxy: str | None = None, transport: httpx.AsyncBaseTransport | None = None) -> dict:
+    """resolve(), with share short links expanded first. A short link that cannot be expanded
+    comes back as kind=short_link."""
+    r = resolve(text)
+    if r["kind"] != "short_link" or not r["url"]:
+        return r
+    full = await expand_short_link(r["url"], proxy, transport)
+    if not full:
+        return r
+    out = resolve(full)
+    if not out["platform"]:
+        return r
+    return {**out, "input": r["input"], "short_link": r["url"]}
+
+
 @router.get("/resolve")
-async def resolve_route(q: str = Query(min_length=1, max_length=2000)):
-    """What is this: a link or id -> platform + kind (post | user | keyword | short_link) + id."""
-    return ok(resolve(q))
+async def resolve_route(request: Request, q: str = Query(min_length=1, max_length=2000), expand: bool = True):
+    """What is this: a link or id -> platform + kind (post | user | keyword | short_link) + id.
+    Share short links (b23.tv, xhslink.com, v.douyin.com ...) are followed to the full link unless
+    expand=false; kind stays short_link when that fails."""
+    if not expand:
+        return ok(resolve(q))
+    return ok(await resolve_link(q, state(request).downloads.proxy))

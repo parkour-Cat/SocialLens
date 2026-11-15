@@ -30,7 +30,10 @@ error means the user must handle it in the browser, then call `resume`.
 Lists return {items, cursor, total}: pass `cursor` back to get the next page. Cursors are short-lived
 (they pin a browser tab); a `cursor_expired` error means start again from page 1. 小红书 ids need the
 `xsec_token` that came with the item that referenced them. Each call drives a real browser tab, so
-requests are rate limited per platform; expect a few seconds each."""
+requests are rate limited per platform; expect a few seconds each.
+
+Users usually paste links, often the apps' share short links: `resolve` turns any link into platform + id
+(+ xsec_token), and `comment_digest` takes the link directly."""
 
 
 class Backend:
@@ -146,18 +149,25 @@ def build_server(base_url: str | None = None) -> MCPServer:
     async def get_replies(platform: str, post_id: str, comment_id: str, cursor: str | None = None, xsec_token: str | None = None) -> dict[str, Any]:
         return await backend.call("GET", f"/api/v1/{platform}/posts/{post_id}/comments/{comment_id}/replies", {"cursor": cursor, "xsec_token": xsec_token})
 
-    @server.tool(description="Up to `limit` comments of a post (default 200, max 1000; pages for you) as a compact digest for analysis: post {title, author, metrics}, stats {fetched, top_level, replies, reported_total, first/last time, likes sum/median/max and the share the top 20 hold, busiest_days, repeat_authors}, top_comments (20 most liked) and others, each {likes, time, author, text, replies}. Text only, no raw payload. Use this rather than get_comments when the question is what the audience thinks; collect.stopped_by says whether the list ended or the limit was hit. 小红书 needs xsec_token.")
-    async def comment_digest(platform: str, post_id: str, limit: int = 200, mode: int | None = None, xsec_token: str | None = None) -> dict[str, Any]:
+    @server.tool(description="Up to `limit` comments of a post (default 200, max 1000; pages for you) as a compact digest for analysis: post {title, author, metrics}, stats {fetched, top_level, replies, reported_total, first/last time, likes sum/median/max and the share the top 20 hold, busiest_days, repeat_authors}, top_comments (20 most liked) and others, each {likes, time, author, text, replies}. Text only, no raw payload. Use this rather than get_comments when the question is what the audience thinks; collect.stopped_by says whether the list ended or the limit was hit. Pass `url` with whatever link the user gave (full link, an app's share short link such as b23.tv / xhslink.com / v.douyin.com, or a bare BV id): platform, post id and 小红书's xsec_token are taken from it. Or pass platform + post_id (+ xsec_token for 小红书).")
+    async def comment_digest(url: str | None = None, platform: str | None = None, post_id: str | None = None, limit: int = 200, mode: int | None = None, xsec_token: str | None = None) -> dict[str, Any]:
+        if url:
+            return await backend.call("GET", "/api/v1/comments/digest", {"url": url, "limit": limit, "mode": mode})
+        if not (platform and post_id):
+            raise ToolError("pass url (a link to the post), or platform and post_id")
         return await backend.call("GET", f"/api/v1/{platform}/posts/{post_id}/comments/digest", {"limit": limit, "mode": mode, "xsec_token": xsec_token})
+
+    @server.tool(description="What a pasted link or id points at: platform, kind (post | user | keyword | short_link), id, and 小红书's xsec_token. Share short links (b23.tv, xhslink.com, v.douyin.com, v.kuaishou.com, youtu.be, redd.it, vm.tiktok.com ...) are followed to the full link. Use it to turn a link the user gives into the platform + id other tools take.")
+    async def resolve(link: str) -> dict[str, Any]:
+        return await backend.call("GET", "/api/v1/resolve", {"q": link})
 
     @server.prompt(
         name="analyze_comments",
         title="Analyze a post's comments",
-        description="Summarise what the audience of one post thinks: sentiment, themes with quotes, questions, disagreements. Arguments: platform, post_id, optional limit and xsec_token.",
+        description="Summarise what the audience of one post thinks: sentiment, themes with quotes, questions, disagreements. Arguments: link (the post's link, a share short link, or a BV id), optional limit.",
     )
-    def analyze_comments(platform: str, post_id: str, limit: str = "200", xsec_token: str = "") -> str:
-        token = f', xsec_token="{xsec_token}"' if xsec_token else ""
-        return f"""Call comment_digest(platform="{platform}", post_id="{post_id}", limit={limit or 200}{token}), then write an analysis of the comments for the user, in the user's language.
+    def analyze_comments(link: str, limit: str = "200") -> str:
+        return f"""Call comment_digest(url={json.dumps(link.strip(), ensure_ascii=False)}, limit={int(limit) if str(limit).strip().isdigit() else 200}), then write an analysis of the comments for the user, in the user's language.
 
 Cover, in this order:
 1. What the post is (title, author, its metrics) and the sample: how many comments you read out of reported_total, the period they span, and whether collect stopped at the limit or the end of the list.

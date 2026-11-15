@@ -14,7 +14,7 @@
 
 在 Claude、Cursor 这类 AI 工具里说一句"分析一下这条视频的评论区"，它就能自己去 B 站、小红书、抖音、YouTube、X 等 14 个平台搜内容、翻评论、看主页，用的是你浏览器里已经登录的账号。你也可以在本地网页控制台里自己点着用，或者把它当成 REST 接口接进自己的脚本。不需要任何平台的 API key，账号凭证不会离开你的浏览器。
 
-<!-- 演示 GIF 放这里：在 Claude 里跑 analyze_comments 的录屏 -->
+<!-- 演示 GIF 放这里：在 Claude 里贴链接分析评论区的录屏 -->
 
 ![控制台：搜索页与详情抽屉](docs/assets/console-query.png)
 
@@ -22,13 +22,13 @@
 
 ## 一句话分析评论区
 
-装好之后（见[快速开始](#快速开始)），在 Claude Code 里输入：
+装好之后（见[快速开始](#快速开始)），把链接贴给 Claude 就行：
 
 ```
-/mcp__sociallens__analyze_comments bilibili BV1xxxxxxxxx
+分析一下这个视频的评论区，观众主要在聊什么 https://b23.tv/xxxxxxx
 ```
 
-或者直接说"帮我看看 BV1xxxxxxxxx 这条视频的评论区，观众主要在聊什么"。Claude 会调用 `comment_digest` 拉最多 200 条评论（自动翻页，只留文字、点赞和时间），然后按固定结构写一份分析：
+App 里"分享"复制出来的短链接（b23.tv、xhslink.com、v.douyin.com……）、网页地址、BV 号都可以。Claude 会调用 `comment_digest` 拉最多 200 条评论（自动翻页，只留文字、点赞和时间），然后写一份分析。想要固定结构的报告，用 MCP 提示词：在 Claude Code 里输入 `/mcp__sociallens__analyze_comments 链接`，报告包括：
 
 > - **样本**：读了多少条、占总评论数多少、时间跨度、点赞是不是集中在少数几条上
 > - **整体评价**：正面、负面、中性大致各占多少，以及有多确定
@@ -36,7 +36,7 @@
 > - **观众的问题**：大家在问作者什么、想看什么
 > - **争议**：观点对立的地方，两边各说了什么
 
-它只引用真实评论的原话，不编造内容，也不会列出评论者的名字。换成 `xiaohongshu`、`youtube`、`douyin` 等平台 id 和帖子 id，其他平台同样能用。
+它只引用真实评论的原话，不编造内容，也不会列出评论者的名字。小红书、抖音、YouTube、X、Reddit 等平台的链接同样能用。
 
 除了评论区，同一套工具还能让 AI 跨平台搜同一个话题、看某个账号最近发了什么、追踪几条帖子的数据变化，也能把结果导出成 Excel 自己看。
 
@@ -162,7 +162,7 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 |---|---|---|
 | GET | `/api/v1/status` | 扩展是否在线、各平台登录态、队列与配额 |
 | GET | `/api/v1/platforms` | 已注册平台及其能力 |
-| GET | `/api/v1/resolve?q=` | 识别一条链接 / id 属于哪个平台、哪个对象 |
+| GET | `/api/v1/resolve?q=` | 识别一条链接 / id 属于哪个平台、哪个对象；App 分享的短链接会先展开 |
 | GET | `/api/v1/{platform}/search?keyword=&type=post\|user&cursor=` | 搜索 |
 | GET | `/api/v1/queries?platform=&action=&q=&limit=` | 查询历史（每次列表查询记下返回的条目 id）；`GET /api/v1/queries/{id}` 取当时的条目并附 `metrics_then`；`GET /api/v1/items/{kind}/{platform}/{id}/history` 是该条目的指标快照序列（指标每次变化存一份） |
 | GET | `/api/v1/known-issues?platform=` | 已知问题清单（未解决 / 待验证 / 站点限制 / 有意为之） |
@@ -172,6 +172,7 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 | GET | `/api/v1/{platform}/posts/{id}` | 帖子详情 |
 | GET | `/api/v1/{platform}/posts/{id}/comments?cursor=` | 评论 |
 | GET | `/api/v1/{platform}/posts/{id}/comments/{comment_id}/replies?cursor=` | 评论的回复 |
+| GET | `/api/v1/comments/digest?url=` | 同下，直接传帖子链接（含短链接） |
 | GET | `/api/v1/{platform}/posts/{id}/comments/digest?limit=200` | 拉最多 limit 条评论并生成摘要：帖子信息、统计（条数、时间范围、点赞集中度、活跃日、重复评论者）、高赞 20 条和其余评论 |
 | GET | `/api/v1/{platform}/users/{id}` | 用户资料 |
 | GET | `/api/v1/{platform}/users/{id}/posts?cursor=` | 用户帖子 |
@@ -221,9 +222,9 @@ claude mcp add sociallens -- uv run --project /path/to/SocialLens/backend social
 }
 ```
 
-tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform 传逗号分隔的多个平台即多平台并行搜索）、`get_post`、`get_comments`、`comment_digest`（自动翻页拉一条帖子的评论，压缩成统计 + 高赞评论 + 其余评论的摘要，只留文字和点赞，适合让模型分析观众反馈）、`get_replies`、`get_user`、`get_user_posts`、`get_feed`、`get_trending`、`collect`、`download`、`health`、`known_issues`、`query_history`、`get_query`、`item_history`、`list_downloads`、`get_task`、`resume`。后端的错误（`not_logged_in`、`captcha_required`、`cursor_expired` 等）原样作为 tool error 交给模型。
+tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform 传逗号分隔的多个平台即多平台并行搜索）、`get_post`、`get_comments`、`resolve`（识别链接是哪个平台的什么内容，App 分享的短链接会自动展开）、`comment_digest`（传帖子链接或平台 + id，自动翻页拉评论，压缩成统计 + 高赞评论 + 其余评论的摘要，只留文字和点赞，适合让模型分析观众反馈）、`get_replies`、`get_user`、`get_user_posts`、`get_feed`、`get_trending`、`collect`、`download`、`health`、`known_issues`、`query_history`、`get_query`、`item_history`、`list_downloads`、`get_task`、`resume`。后端的错误（`not_logged_in`、`captcha_required`、`cursor_expired` 等）原样作为 tool error 交给模型。
 
-prompts：`analyze_comments`（参数 platform、post_id），让模型调 `comment_digest` 后按「样本说明 → 整体评价 → 主要话题和原话 → 观众提问 → 争议 → 数据上的异常」写一份评论分析。在 Claude Code 里是 `/mcp__sociallens__analyze_comments`。
+prompts：`analyze_comments`（参数：帖子链接），让模型调 `comment_digest` 后按「样本说明 → 整体评价 → 主要话题和原话 → 观众提问 → 争议 → 数据上的异常」写一份评论分析。在 Claude Code 里是 `/mcp__sociallens__analyze_comments`。
 
 ## 下载与代理
 

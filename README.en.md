@@ -14,7 +14,7 @@
 
 Ask Claude, Cursor or any MCP client to "analyse the comments under this video", and it goes to YouTube, X, Reddit, TikTok, Instagram, Bilibili, Xiaohongshu and 7 more platforms itself: searching, reading comments, opening profiles, through the accounts you are already signed in to in your browser. You can also click around in the local web console, or call it as a REST API from your own scripts. No platform API keys, and your credentials never leave the browser.
 
-<!-- demo GIF goes here: analyze_comments running in Claude -->
+<!-- demo GIF goes here: pasting a link into Claude and getting the comment analysis -->
 
 ![Console: search page with the detail drawer](docs/assets/console-query.en.png)
 
@@ -22,13 +22,13 @@ Ask Claude, Cursor or any MCP client to "analyse the comments under this video",
 
 ## Analyse a comment section in one line
 
-Once installed (see [Quick start](#quick-start)), type in Claude Code:
+Once installed (see [Quick start](#quick-start)), just give Claude the link:
 
 ```
-/mcp__sociallens__analyze_comments youtube VIDEO_ID
+What is the audience talking about under this video? https://youtu.be/VIDEO_ID
 ```
 
-or just say "look at the comments under this video, what is the audience talking about?". Claude calls `comment_digest` to fetch up to 200 comments (paged for it, text, likes and time only) and writes an analysis with a fixed structure:
+A page URL, an app's share short link (youtu.be, b23.tv, xhslink.com, v.douyin.com, ...) or a bare id all work. Claude calls `comment_digest` to fetch up to 200 comments (paged for it, text, likes and time only) and writes an analysis. For a report with a fixed structure, use the MCP prompt: type `/mcp__sociallens__analyze_comments LINK` in Claude Code. The report covers:
 
 > - **Sample**: how many comments it read out of the total, over what period, and whether a few comments hold most of the likes
 > - **Overall reception**: roughly how positive, negative and neutral, and how sure it is
@@ -36,7 +36,7 @@ or just say "look at the comments under this video, what is the audience talking
 > - **Audience questions**: what people ask the author or want to see next
 > - **Disagreements**: where opinions split, and what each side says
 
-It quotes real comments verbatim, never invents any, and leaves commenters' names out. Use another platform id (`bilibili`, `xiaohongshu`, `x`, `reddit`, ...) and post id for other platforms.
+It quotes real comments verbatim, never invents any, and leaves commenters' names out. Links from Bilibili, Xiaohongshu, Douyin, X, Reddit and the other platforms work the same way.
 
 Beyond comments, the same tools let an AI search one topic across platforms, check what an account posted lately, follow how a few posts' numbers move, and export results to Excel for you.
 
@@ -162,7 +162,7 @@ Every response is `{"success": true, "data": ...}` or `{"success": false, "error
 |---|---|---|
 | GET | `/api/v1/status` | extension online?, per-platform login state, queues and budgets |
 | GET | `/api/v1/platforms` | registered platforms and their capabilities |
-| GET | `/api/v1/resolve?q=` | which platform and object a link / id points to |
+| GET | `/api/v1/resolve?q=` | which platform and object a link / id points to; share short links are expanded first |
 | GET | `/api/v1/{platform}/search?keyword=&type=post\|user&cursor=` | search |
 | GET | `/api/v1/queries?platform=&action=&q=&limit=` | query history (every list query records the ids it returned); `GET /api/v1/queries/{id}` returns those items with `metrics_then`; `GET /api/v1/items/{kind}/{platform}/{id}/history` is the item's metric snapshots (one per observed change) |
 | GET | `/api/v1/known-issues?platform=` | known issues (open / unverified / site limit / by design) |
@@ -172,6 +172,7 @@ Every response is `{"success": true, "data": ...}` or `{"success": false, "error
 | GET | `/api/v1/{platform}/posts/{id}` | post detail |
 | GET | `/api/v1/{platform}/posts/{id}/comments?cursor=` | comments |
 | GET | `/api/v1/{platform}/posts/{id}/comments/{comment_id}/replies?cursor=` | replies under one comment |
+| GET | `/api/v1/comments/digest?url=` | the same, from a post link (share short links included) |
 | GET | `/api/v1/{platform}/posts/{id}/comments/digest?limit=200` | collect up to limit comments and digest them: the post, stats (counts, period, how concentrated the likes are, busiest days, repeat authors), the 20 most liked and the rest |
 | GET | `/api/v1/{platform}/users/{id}` | profile |
 | GET | `/api/v1/{platform}/users/{id}/posts?cursor=` | a user's posts |
@@ -221,9 +222,9 @@ If you installed with option 1 (uvx), use `uvx --from "git+https://github.com/pa
 }
 ```
 
-Tools: `status`, `list_platforms`, `get_capabilities`, `search` (pass comma-separated platform ids to search several at once), `get_post`, `get_comments`, `comment_digest` (pages through a post's comments and compacts them into stats + most-liked + the rest, text and likes only, for a model to analyse audience reaction), `get_replies`, `get_user`, `get_user_posts`, `get_feed`, `get_trending`, `collect`, `download`, `list_downloads`, `get_task`, `resume`, `health`, `known_issues`, `query_history`, `get_query`, `item_history`. Backend errors (`not_logged_in`, `captcha_required`, `cursor_expired`, …) are passed through as tool errors.
+Tools: `status`, `list_platforms`, `get_capabilities`, `search` (pass comma-separated platform ids to search several at once), `get_post`, `get_comments`, `resolve` (what a link points at; share short links are expanded), `comment_digest` (takes a post link or platform + id, pages through a post's comments and compacts them into stats + most-liked + the rest, text and likes only, for a model to analyse audience reaction), `get_replies`, `get_user`, `get_user_posts`, `get_feed`, `get_trending`, `collect`, `download`, `list_downloads`, `get_task`, `resume`, `health`, `known_issues`, `query_history`, `get_query`, `item_history`. Backend errors (`not_logged_in`, `captcha_required`, `cursor_expired`, …) are passed through as tool errors.
 
-Prompts: `analyze_comments` (arguments platform, post_id) has the model call `comment_digest` and write a comment analysis: the sample, overall reception, main themes with quotes, audience questions, disagreements, anything notable in the stats. In Claude Code it is `/mcp__sociallens__analyze_comments`.
+Prompts: `analyze_comments` (argument: the post's link) has the model call `comment_digest` and write a comment analysis: the sample, overall reception, main themes with quotes, audience questions, disagreements, anything notable in the stats. In Claude Code it is `/mcp__sociallens__analyze_comments`.
 
 ## Downloads and proxies
 

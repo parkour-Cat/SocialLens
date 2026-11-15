@@ -167,7 +167,7 @@ async function run() {
       const r = (await api("/resolve?q=" + encodeURIComponent(raw))).data;
       if (r.kind === "post" && r.platform) return quick(r.platform, "get_post", { id: r.id, xsec: r.xsec_token });
       if (r.kind === "user" && r.platform) return quick(r.platform, "get_user", { id: r.id, xsec: r.xsec_token });
-      if (r.kind === "short_link") return toast(`${pname(r.platform)} 的短链接暂时不能直接解析，请打开后复制完整地址`, true);
+      if (r.kind === "short_link") return toast(`${pname(r.platform)} 的短链接没能展开（网络或代理问题），请打开后复制完整地址`, true);
       if (r.kind === "keyword" && r.id) { F.keyword = r.id; if (r.platform) F.sel = [r.platform]; }
     } catch (e) { return toast(e.message, true); }
   }

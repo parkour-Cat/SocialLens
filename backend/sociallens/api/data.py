@@ -11,6 +11,7 @@ from fastapi import APIRouter, Query, Request
 from ..digest import comment_digest as build_comment_digest
 from ..models.errors import ErrorCode, SocialLensError
 from .deps import ok, state
+from .resolve import resolve_link
 
 router = APIRouter(tags=["data"])
 
@@ -150,6 +151,32 @@ async def comment_digest(
     the post, stats (counts, period, how concentrated the likes are, busiest days, repeat
     authors), the 20 most-liked comments and the rest, text and likes only. Made for summarising
     what an audience thinks without the raw platform payload."""
+    return await _comment_digest(request, platform, post_id, limit, mode, xsec_token, include_post, wait_s)
+
+
+@router.get("/comments/digest")
+async def comment_digest_by_link(
+    request: Request,
+    url: str = Query(min_length=1, max_length=2000),
+    limit: int = Query(default=200, ge=1, le=1000),
+    mode: int | None = None,
+    include_post: bool = True,
+    wait_s: float = 600,
+):
+    """The same digest for a pasted post link: full links, the apps' share short links (b23.tv,
+    xhslink.com, v.douyin.com ...) or a bare BV id. Platform, post id and 小红书's xsec_token are
+    taken from the link."""
+    r = await resolve_link(url, state(request).downloads.proxy)
+    if r["kind"] == "short_link":
+        raise SocialLensError(ErrorCode.BAD_REQUEST, f"could not follow the {r['platform']} short link {r['url']}; open it and pass the full link")
+    if r["kind"] != "post" or not r["platform"] or not r["id"]:
+        raise SocialLensError(ErrorCode.BAD_REQUEST, f"not a post link: {url}", {"resolved": r})
+    out = await _comment_digest(request, r["platform"], r["id"], limit, mode, r.get("xsec_token"), include_post, wait_s)
+    out["data"]["resolved"] = {k: r.get(k) for k in ("platform", "id", "url", "short_link") if r.get(k)}
+    return out
+
+
+async def _comment_digest(request: Request, platform: str, post_id: str, limit: int, mode: int | None, xsec_token: str | None, include_post: bool, wait_s: float) -> dict[str, Any]:
     _adapter(request, platform)
     st = state(request)
     post, post_error = None, None
