@@ -146,6 +146,29 @@ def build_server(base_url: str | None = None) -> MCPServer:
     async def get_replies(platform: str, post_id: str, comment_id: str, cursor: str | None = None, xsec_token: str | None = None) -> dict[str, Any]:
         return await backend.call("GET", f"/api/v1/{platform}/posts/{post_id}/comments/{comment_id}/replies", {"cursor": cursor, "xsec_token": xsec_token})
 
+    @server.tool(description="Up to `limit` comments of a post (default 200, max 1000; pages for you) as a compact digest for analysis: post {title, author, metrics}, stats {fetched, top_level, replies, reported_total, first/last time, likes sum/median/max and the share the top 20 hold, busiest_days, repeat_authors}, top_comments (20 most liked) and others, each {likes, time, author, text, replies}. Text only, no raw payload. Use this rather than get_comments when the question is what the audience thinks; collect.stopped_by says whether the list ended or the limit was hit. 小红书 needs xsec_token.")
+    async def comment_digest(platform: str, post_id: str, limit: int = 200, mode: int | None = None, xsec_token: str | None = None) -> dict[str, Any]:
+        return await backend.call("GET", f"/api/v1/{platform}/posts/{post_id}/comments/digest", {"limit": limit, "mode": mode, "xsec_token": xsec_token})
+
+    @server.prompt(
+        name="analyze_comments",
+        title="Analyze a post's comments",
+        description="Summarise what the audience of one post thinks: sentiment, themes with quotes, questions, disagreements. Arguments: platform, post_id, optional limit and xsec_token.",
+    )
+    def analyze_comments(platform: str, post_id: str, limit: str = "200", xsec_token: str = "") -> str:
+        token = f', xsec_token="{xsec_token}"' if xsec_token else ""
+        return f"""Call comment_digest(platform="{platform}", post_id="{post_id}", limit={limit or 200}{token}), then write an analysis of the comments for the user, in the user's language.
+
+Cover, in this order:
+1. What the post is (title, author, its metrics) and the sample: how many comments you read out of reported_total, the period they span, and whether collect stopped at the limit or the end of the list.
+2. Overall reception: the balance of positive, negative and neutral comments, as an estimate, with how sure you are.
+3. The 3 to 6 main themes. For each: what people say, roughly how common it is, and one or two short verbatim quotes with their like counts.
+4. Questions and requests the audience addresses to the author.
+5. Disagreements or controversies, with both sides.
+6. Anything notable in the stats: a few comments holding most of the likes (top20_share), bursts on certain days, authors who comment many times.
+
+Rules: quote comments verbatim and mark quotes as quotes; never invent comments or numbers; likes say what resonated, not how many people agree; say when the sample is too small to conclude something. Do not reproduce commenters' names unless the user asks."""
+
     @server.tool(description="Profile of a user / channel / account by platform id or handle (youtube accepts @handle, x accepts screen name).")
     async def get_user(platform: str, user_id: str, xsec_token: str | None = None) -> dict[str, Any]:
         return await backend.call("GET", f"/api/v1/{platform}/users/{user_id}", {"xsec_token": xsec_token})

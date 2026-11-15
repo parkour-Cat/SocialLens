@@ -148,6 +148,7 @@ Every response is `{"success": true, "data": ...}` or `{"success": false, "error
 | GET | `/api/v1/{platform}/posts/{id}` | post detail |
 | GET | `/api/v1/{platform}/posts/{id}/comments?cursor=` | comments |
 | GET | `/api/v1/{platform}/posts/{id}/comments/{comment_id}/replies?cursor=` | replies under one comment |
+| GET | `/api/v1/{platform}/posts/{id}/comments/digest?limit=200` | collect up to limit comments and digest them: the post, stats (counts, period, how concentrated the likes are, busiest days, repeat authors), the 20 most liked and the rest |
 | GET | `/api/v1/{platform}/users/{id}` | profile |
 | GET | `/api/v1/{platform}/users/{id}/posts?cursor=` | a user's posts |
 | GET | `/api/v1/{platform}/feed?cursor=` | recommendation feed / home timeline |
@@ -196,7 +197,9 @@ If you installed with option 1 (uvx), use `uvx --from "git+https://github.com/pa
 }
 ```
 
-Tools: `status`, `list_platforms`, `get_capabilities`, `search` (pass comma-separated platform ids to search several at once), `get_post`, `get_comments`, `get_replies`, `get_user`, `get_user_posts`, `get_feed`, `get_trending`, `collect`, `download`, `list_downloads`, `get_task`, `resume`, `health`, `known_issues`, `query_history`, `get_query`, `item_history`. Backend errors (`not_logged_in`, `captcha_required`, `cursor_expired`, …) are passed through as tool errors.
+Tools: `status`, `list_platforms`, `get_capabilities`, `search` (pass comma-separated platform ids to search several at once), `get_post`, `get_comments`, `comment_digest` (pages through a post's comments and compacts them into stats + most-liked + the rest, text and likes only, for a model to analyse audience reaction), `get_replies`, `get_user`, `get_user_posts`, `get_feed`, `get_trending`, `collect`, `download`, `list_downloads`, `get_task`, `resume`, `health`, `known_issues`, `query_history`, `get_query`, `item_history`. Backend errors (`not_logged_in`, `captcha_required`, `cursor_expired`, …) are passed through as tool errors.
+
+Prompts: `analyze_comments` (arguments platform, post_id) has the model call `comment_digest` and write a comment analysis: the sample, overall reception, main themes with quotes, audience questions, disagreements, anything notable in the stats. In Claude Code it is `/mcp__sociallens__analyze_comments`.
 
 ## Downloads and proxies
 

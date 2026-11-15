@@ -37,6 +37,7 @@ EXPECTED_TOOLS = {
     "download",
     "collect",
     "list_downloads",
+    "comment_digest",
 }
 
 
@@ -98,6 +99,12 @@ async def test_tools_and_system_calls(backend_url):
             caps = _payload(await session.call_tool("get_capabilities", {"platform": "bilibili"}))
             assert "search_posts" in json.dumps(caps)
 
+            prompts = {pr.name: pr for pr in (await session.list_prompts()).prompts}
+            assert {a.name for a in prompts["analyze_comments"].arguments} >= {"platform", "post_id"}
+            got = await session.get_prompt("analyze_comments", {"platform": "bilibili", "post_id": "BV1xx"})
+            text = got.messages[0].content.text
+            assert 'comment_digest(platform="bilibili", post_id="BV1xx", limit=200)' in text and "verbatim" in text
+
 
 async def test_data_tool_errors_without_extension(backend_url):
     async with stdio_client(_params(backend_url)) as (read, write):
@@ -106,6 +113,9 @@ async def test_data_tool_errors_without_extension(backend_url):
             res = await session.call_tool("search", {"platform": "bilibili", "keyword": "露营"})
             assert res.is_error
             assert "extension_offline" in res.content[0].text
+
+            res = await session.call_tool("comment_digest", {"platform": "bilibili", "post_id": "BV1xx"})
+            assert res.is_error and "extension_offline" in res.content[0].text
 
             res = await session.call_tool("get_post", {"platform": "nope", "post_id": "1"})
             assert res.is_error and "unknown_platform" in res.content[0].text

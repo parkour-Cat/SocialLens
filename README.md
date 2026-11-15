@@ -148,6 +148,7 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 | GET | `/api/v1/{platform}/posts/{id}` | 帖子详情 |
 | GET | `/api/v1/{platform}/posts/{id}/comments?cursor=` | 评论 |
 | GET | `/api/v1/{platform}/posts/{id}/comments/{comment_id}/replies?cursor=` | 评论的回复 |
+| GET | `/api/v1/{platform}/posts/{id}/comments/digest?limit=200` | 拉最多 limit 条评论并生成摘要：帖子信息、统计（条数、时间范围、点赞集中度、活跃日、重复评论者）、高赞 20 条和其余评论 |
 | GET | `/api/v1/{platform}/users/{id}` | 用户资料 |
 | GET | `/api/v1/{platform}/users/{id}/posts?cursor=` | 用户帖子 |
 | GET | `/api/v1/{platform}/feed?cursor=` | 推荐流 / 首页时间线 |
@@ -196,7 +197,9 @@ claude mcp add sociallens -- uv run --project /path/to/SocialLens/backend social
 }
 ```
 
-tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform 传逗号分隔的多个平台即多平台并行搜索）、`get_post`、`get_comments`、`get_replies`、`get_user`、`get_user_posts`、`get_feed`、`get_trending`、`collect`、`download`、`health`、`known_issues`、`query_history`、`get_query`、`item_history`、`list_downloads`、`get_task`、`resume`。后端的错误（`not_logged_in`、`captcha_required`、`cursor_expired` 等）原样作为 tool error 交给模型。
+tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform 传逗号分隔的多个平台即多平台并行搜索）、`get_post`、`get_comments`、`comment_digest`（自动翻页拉一条帖子的评论，压缩成统计 + 高赞评论 + 其余评论的摘要，只留文字和点赞，适合让模型分析观众反馈）、`get_replies`、`get_user`、`get_user_posts`、`get_feed`、`get_trending`、`collect`、`download`、`health`、`known_issues`、`query_history`、`get_query`、`item_history`、`list_downloads`、`get_task`、`resume`。后端的错误（`not_logged_in`、`captcha_required`、`cursor_expired` 等）原样作为 tool error 交给模型。
+
+prompts：`analyze_comments`（参数 platform、post_id），让模型调 `comment_digest` 后按「样本说明 → 整体评价 → 主要话题和原话 → 观众提问 → 争议 → 数据上的异常」写一份评论分析。在 Claude Code 里是 `/mcp__sociallens__analyze_comments`。
 
 ## 下载与代理
 

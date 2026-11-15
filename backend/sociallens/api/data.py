@@ -8,6 +8,7 @@ from typing import Any
 from pydantic import BaseModel
 from fastapi import APIRouter, Query, Request
 
+from ..digest import comment_digest as build_comment_digest
 from ..models.errors import ErrorCode, SocialLensError
 from .deps import ok, state
 
@@ -132,6 +133,46 @@ async def get_comments(
 async def get_replies(request: Request, platform: str, post_id: str, comment_id: str, cursor: str | None = None, xsec_token: str | None = None):
     """Replies under one comment (楼中楼). Same {items, cursor, total} shape as comments; parent_id is the comment."""
     return await _run(request, platform, "get_replies", {"post_id": post_id, "comment_id": comment_id, "cursor": cursor, "xsec_token": xsec_token}, kind="comments")
+
+
+@router.get("/{platform}/posts/{post_id}/comments/digest")
+async def comment_digest(
+    request: Request,
+    platform: str,
+    post_id: str,
+    limit: int = Query(default=200, ge=1, le=1000),
+    mode: int | None = None,
+    xsec_token: str | None = None,
+    include_post: bool = True,
+    wait_s: float = 600,
+):
+    """Collect up to `limit` comments of a post (paging like /collect) and return a compact digest:
+    the post, stats (counts, period, how concentrated the likes are, busiest days, repeat
+    authors), the 20 most-liked comments and the rest, text and likes only. Made for summarising
+    what an audience thinks without the raw platform payload."""
+    _adapter(request, platform)
+    st = state(request)
+    post, post_error = None, None
+    if include_post:
+        try:
+            post = (await _run(request, platform, "get_post", {"id": post_id, "xsec_token": xsec_token}, kind="posts"))["data"]
+        except SocialLensError as e:
+            post_error = e.to_dict()  # the comments are still worth having
+    params: dict[str, Any] = {k: v for k, v in {"post_id": post_id, "mode": mode, "xsec_token": xsec_token}.items() if v is not None}
+    if request.headers.get("x-sociallens-allow-anonymous") == "1":
+        params["allow_anonymous"] = True
+    task = await st.collects.start(platform, "get_comments", params, limit, None)
+    await st.collects.wait(task, wait_s)
+    r = task.result or {}
+    items = r.get("items") or []
+    if not items and r.get("error"):
+        err = r["error"]
+        raise SocialLensError(err.get("code", ErrorCode.INTERNAL), err.get("message", ""), err.get("details"))
+    out = build_comment_digest(items, post)
+    out["collect"] = {"task_id": task.id, "status": task.status, "complete": r.get("complete"), "stopped_by": r.get("stopped_by"), "pages": r.get("pages"), "error": r.get("error")}
+    if post_error:
+        out["post_error"] = post_error
+    return ok(out, platform=platform, task_id=task.id)
 
 
 @router.get("/{platform}/users/{user_id}")
