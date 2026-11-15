@@ -8,7 +8,7 @@
 
 [中文](README.md) | English
 
-![platforms](https://img.shields.io/badge/platforms-14-0f766e) ![python](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white) ![fastapi](https://img.shields.io/badge/FastAPI-REST-009688?logo=fastapi&logoColor=white) ![chrome](https://img.shields.io/badge/Chrome-MV3%20extension-4285f4?logo=googlechrome&logoColor=white) ![mcp](https://img.shields.io/badge/MCP-server-8a5cf6) ![local](https://img.shields.io/badge/binds-127.0.0.1%20only-555)
+![platforms](https://img.shields.io/badge/platforms-14-0f766e) ![python](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white) ![fastapi](https://img.shields.io/badge/FastAPI-REST-009688?logo=fastapi&logoColor=white) ![chrome](https://img.shields.io/badge/Chrome-MV3%20extension-4285f4?logo=googlechrome&logoColor=white) ![mcp](https://img.shields.io/badge/MCP-server-8a5cf6) ![local](https://img.shields.io/badge/binds-127.0.0.1%20only-555) ![license](https://img.shields.io/badge/license-PolyForm%20Noncommercial-b45309)
 
 </div>
 
@@ -212,6 +212,12 @@ scripts/   end-to-end test and sampling scripts
 data/      runtime files: token, SQLite, recorded samples, downloads, logs (not committed)
 ```
 
+## License
+
+Published under [PolyForm Noncommercial 1.0.0](LICENSE): free to use, modify and share for personal study, research and hobby projects, and for schools, charities and research institutions, but not for any commercial purpose. Contact the author for a commercial license.
+
+Contributions are welcome; read the contribution grant in [CONTRIBUTING.md](CONTRIBUTING.md) before submitting.
+
 ## Disclaimer
 
 **Scope of use.** This project exists for personal learning, technical research and managing your own account data. It must not be used for commercial harvesting, data resale or any other for-profit activity. If you do not intend to use it within these limits, delete it within 24 hours of downloading.
@@ -224,6 +230,6 @@ data/      runtime files: token, SQLite, recorded samples, downloads, logs (not 
 
 **No affiliation.** The project is not connected to, authorised by or endorsed by any platform mentioned here. Platform names and logos belong to their respective owners and appear only for identification.
 
-**Intellectual property.** The code and documentation are protected by copyright law and the relevant international treaties, and belong to the developer. You may download, use and modify the project provided you comply with this disclaimer and applicable law.
+**Intellectual property.** The code and documentation are protected by copyright law and the relevant international treaties, and belong to the developer. You may download, use and modify the project within the terms of the [LICENSE](LICENSE), provided you also comply with this disclaimer and applicable law.
 
 **Acceptance.** Using the project's code or features means you have read and accept everything above and voluntarily take on the associated risks and consequences. If you do not agree, do not use it. The developer may revise this disclaimer at any time and has the final say on its interpretation.

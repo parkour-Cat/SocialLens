@@ -8,7 +8,7 @@
 
 中文 | [English](README.en.md)
 
-![platforms](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-14-0f766e) ![python](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white) ![fastapi](https://img.shields.io/badge/FastAPI-REST-009688?logo=fastapi&logoColor=white) ![chrome](https://img.shields.io/badge/Chrome-MV3%20%E6%89%A9%E5%B1%95-4285f4?logo=googlechrome&logoColor=white) ![mcp](https://img.shields.io/badge/MCP-server-8a5cf6) ![local](https://img.shields.io/badge/%E5%8F%AA%E7%9B%91%E5%90%AC-127.0.0.1-555)
+![platforms](https://img.shields.io/badge/%E5%B9%B3%E5%8F%B0-14-0f766e) ![python](https://img.shields.io/badge/Python-3.12-3776ab?logo=python&logoColor=white) ![fastapi](https://img.shields.io/badge/FastAPI-REST-009688?logo=fastapi&logoColor=white) ![chrome](https://img.shields.io/badge/Chrome-MV3%20%E6%89%A9%E5%B1%95-4285f4?logo=googlechrome&logoColor=white) ![mcp](https://img.shields.io/badge/MCP-server-8a5cf6) ![local](https://img.shields.io/badge/%E5%8F%AA%E7%9B%91%E5%90%AC-127.0.0.1-555) ![license](https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-PolyForm%20%E9%9D%9E%E5%95%86%E4%B8%9A-b45309)
 
 </div>
 
@@ -212,6 +212,12 @@ scripts/   端到端测试与录样本脚本
 data/      运行时生成：token、SQLite、录制样本、下载、日志（不入库）
 ```
 
+## 许可证
+
+本项目按 [PolyForm Noncommercial 1.0.0](LICENSE) 发布：个人学习、研究、业余项目，以及学校、公益和研究机构可以免费使用、修改和分发，但不得用于任何商业目的。需要商业授权请联系作者。
+
+欢迎贡献；提交前请读 [CONTRIBUTING.md](CONTRIBUTING.md) 里的贡献授权条款。
+
 ## 免责声明
 
 **用途限制。** 本项目只用于个人学习、技术研究和管理你自己的账号数据，不得用于商业采集、数据转售或任何营利活动。如果你下载后不打算在这些范围内使用，请在 24 小时内删除。
@@ -224,6 +230,6 @@ data/      运行时生成：token、SQLite、录制样本、下载、日志（�
 
 **与平台无关。** 本项目和文中提到的任何平台都没有关联，未获得其授权或背书。平台名称和图标归各自所有者所有，出现在这里只是为了标识。
 
-**知识产权。** 本项目的代码和文档受著作权法及相关国际条约保护，权利归开发者所有。在遵守本声明和相关法律的前提下，你可以下载、使用和修改它。
+**知识产权。** 本项目的代码和文档受著作权法及相关国际条约保护，权利归开发者所有。你可以在 [LICENSE](LICENSE) 允许的范围内，并在遵守本声明和相关法律的前提下下载、使用和修改它。
 
 **接受条款。** 使用本项目的代码或功能，即表示你已经读过并接受以上全部内容，并自愿承担相应的风险和后果。若不同意，请不要使用。开发者保留随时修改本声明的权利，并对本声明拥有最终解释权。
