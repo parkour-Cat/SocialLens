@@ -2,7 +2,7 @@
 
 Each action opens a temporary background tab (navigate strategy) in the connected browser and
 returns the raw page payload; pagination is sampled by scrolling the same tab. Saves to
-backend/tests/fixtures/xiaohongshu/. Needs: backend running, extension reloaded with the
+backend/tests/fixtures_raw/xiaohongshu/. Needs: backend running, extension reloaded with the
 xiaohongshu actions, Chrome logged in to 小红书.
 
 Usage: uv run --project backend python scripts/sample_xiaohongshu.py
@@ -20,7 +20,7 @@ import urllib.request
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-FIXTURES = REPO / "backend" / "tests" / "fixtures" / "xiaohongshu"
+FIXTURES = REPO / "backend" / "tests" / "fixtures_raw" / "xiaohongshu"
 BACKEND = os.environ.get("SOCIALLENS_URL", "http://127.0.0.1:17800")
 KEYWORD = os.environ.get("KEYWORD", "露营")
 

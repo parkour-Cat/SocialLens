@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
-FIXTURES = REPO / "backend" / "tests" / "fixtures" / "kuaishou"
+FIXTURES = REPO / "backend" / "tests" / "fixtures_raw" / "kuaishou"
 BACKEND = os.environ.get("SOCIALLENS_URL", "http://127.0.0.1:17800")
 KEYWORD = os.environ.get("KEYWORD", "露营")
 

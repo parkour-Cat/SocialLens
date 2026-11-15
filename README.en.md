@@ -220,7 +220,12 @@ cd backend && uv run python -m playwright install chromium
 cd .. && uv run --project backend python scripts/e2e_chrome.py
 ```
 
-Parser tests use recorded samples in `backend/tests/fixtures/{platform}/`. They are recorded with real accounts and contain account data, so they are not in the repository; tests skip when a sample is missing. `POST /api/v1/{platform}/run` with `"raw": true` returns any action's raw response, and `scripts/sample_*.py` record samples.
+Parser tests read samples from `backend/tests/fixtures/{platform}/`; a test whose sample is missing skips. Samples come in two steps:
+
+1. `scripts/sample_*.py` record raw responses into `backend/tests/fixtures_raw/{platform}/`. Raw samples hold real users' ids, names, avatars and comments, plus your own account data when recorded logged in, so that directory is not committed.
+2. `uv run --project backend python scripts/scrub_fixtures.py {platform}` writes a scrubbed copy to `fixtures/`: user ids become random numbers, names 用户N, avatars a placeholder, signatures and comment bodies placeholder text, with structure and formats unchanged. If any original name, id or avatar can still be found in the output, it refuses to write. Only platforms with rules in the script can be scrubbed; add rules for a new platform first.
+
+`fixtures/` is committed and CI runs these tests; `test_fixture_hygiene.py` also checks committed samples for login cookies, tokens and similar credentials. `POST /api/v1/{platform}/run` with `"raw": true` returns any action's raw response.
 
 Adding a platform: copy `docs/platforms/_template.md` and fill in the capability list; write the extension side in `platforms/{platform}/` (URL matching, login detection) and `page/platforms/{platform}.ts` (page actions returning raw JSON); write the backend adapter in `platforms/{platform}/` (capabilities, rate limit, entry URLs) and parsers (pure functions into the unified model); add the host permission to `manifest.json`. Generic page actions for exploration: `echo`, `fetch`, `wait_capture`, `scroll_capture`, `dom_probe`, `list_captures`, `find_scripts`, `read_element`, `click`, `type`.
 

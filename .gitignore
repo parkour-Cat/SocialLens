@@ -25,5 +25,5 @@ Thumbs.db
 CLAUDE.md
 docs/design.md
 docs/ui-proposal.*
-backend/tests/fixtures/
+backend/tests/fixtures_raw/
 .claude/

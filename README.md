@@ -220,7 +220,12 @@ cd backend && uv run python -m playwright install chromium
 cd .. && uv run --project backend python scripts/e2e_chrome.py
 ```
 
-parser 测试依赖 `backend/tests/fixtures/{platform}/` 里的录制样本。样本是用真实账号录的、包含账号信息，所以不在仓库里；没有样本时对应测试自动跳过。`POST /api/v1/{platform}/run` 带 `"raw": true` 可以拿到任何动作的原始响应，`scripts/sample_*.py` 是录样本的脚本。
+parser 测试读 `backend/tests/fixtures/{platform}/` 里的样本，没有样本的测试自动跳过。样本分两步得到：
+
+1. `scripts/sample_*.py` 录原始响应到 `backend/tests/fixtures_raw/{platform}/`。原始样本含真实用户的 id、昵称、头像、评论，登录录制时还有你自己的账号信息，这个目录不入库。
+2. `uv run --project backend python scripts/scrub_fixtures.py {platform}` 生成脱敏副本到 `fixtures/`：用户 id 换成随机数、昵称换成「用户N」、头像换成占位图、签名和评论正文换成占位文字，结构和格式不变。输出里只要还能找到任何原始昵称、id 或头像，脚本就拒绝写入。只有在脚本里写了规则的平台才能脱敏，新平台要先加规则。
+
+`fixtures/` 入库，CI 会跑这些测试；`test_fixture_hygiene.py` 另外检查入库样本里没有登录 cookie、token 之类的凭据。`POST /api/v1/{platform}/run` 带 `"raw": true` 可以拿到任何动作的原始响应。
 
 新增一个平台：复制 `docs/platforms/_template.md` 填能力清单；在扩展的 `platforms/{platform}/`（URL 匹配、登录检测）和 `page/platforms/{platform}.ts`（页面动作，返回原始 JSON）写扩展侧；在后端 `platforms/{platform}/` 写 adapter（能力、限速、入口 URL）和 parser（纯函数，转统一模型）；在 `manifest.json` 加 host 权限。开发时可用的通用页面动作：`echo`、`fetch`、`wait_capture`、`scroll_capture`、`dom_probe`、`list_captures`、`find_scripts`、`read_element`、`click`、`type`。
 

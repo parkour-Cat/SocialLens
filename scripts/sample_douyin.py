@@ -2,7 +2,7 @@
 
 Same approach as sample_xiaohongshu.py: each action opens a temporary tab in the extension's
 work window, the site issues its own signed requests, we capture them; pagination by scrolling.
-Saves to backend/tests/fixtures/douyin/.
+Saves to backend/tests/fixtures_raw/douyin/.
 
 Usage: uv run --project backend python scripts/sample_douyin.py
 """
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parent.parent
-FIXTURES = REPO / "backend" / "tests" / "fixtures" / "douyin"
+FIXTURES = REPO / "backend" / "tests" / "fixtures_raw" / "douyin"
 BACKEND = os.environ.get("SOCIALLENS_URL", "http://127.0.0.1:17800")
 KEYWORD = os.environ.get("KEYWORD", "露营")
 

@@ -1,0 +1,270 @@
+{
+  "code": 0,
+  "message": "OK",
+  "ttl": 1,
+  "data": {
+    "bvid": "BV1rpWjevEip",
+    "aid": 113006243481679,
+    "videos": 100,
+    "tid": 231,
+    "tid_v2": 2103,
+    "tname": "",
+    "tname_v2": "",
+    "copyright": 1,
+    "pic": "http://i2.hdslb.com/bfs/archive/a979056b1a32012cdd00d48fbc3732d253e30620.jpg",
+    "title": "【全748集】目前B站最全最细的Python零基础全套教程，2026最新版，包含所有干货！七天就能从小白到大神！少走99%的弯路！存下吧！很难找全的！",
+    "pubdate": 1724338758,
+    "ctime": 1724338759,
+    "desc": "示例简介 15",
+    "desc_v2": [
+      {
+        "raw_text": "示例简介 16",
+        "type": 1,
+        "biz_id": 0
+      }
+    ],
+    "state": 0,
+    "duration": 143894,
+    "rights": {
+      "bp": 0,
+      "elec": 0,
+      "download": 1,
+      "movie": 0,
+      "pay": 0,
+      "hd5": 0,
+      "no_reprint": 0,
+      "autoplay": 1,
+      "ugc_pay": 0,
+      "is_cooperation": 0,
+      "ugc_pay_preview": 0,
+      "no_background": 0,
+      "clean_mode": 0,
+      "is_stein_gate": 0,
+      "is_360": 0,
+      "no_share": 0,
+      "arc_pay": 0,
+      "free_watch": 0
+    },
+    "owner": {
+      "mid": 7889955545052262,
+      "name": "用户2",
+      "face": "https://i0.hdslb.com/bfs/face/member/noface.jpg"
+    },
+    "stat": {
+      "aid": 113006243481679,
+      "view": 21773316,
+      "danmaku": 136588,
+      "reply": 371847,
+      "favorite": 921813,
+      "coin": 425640,
+      "share": 107190,
+      "now_rank": 0,
+      "his_rank": 0,
+      "like": 600989,
+      "dislike": 0,
+      "evaluation": "",
+      "vt": 0
+    },
+    "argue_info": {
+      "argue_msg": "",
+      "argue_type": 0,
+      "argue_link": ""
+    },
+    "dynamic": "",
+    "cid": 36010133667,
+    "dimension": {
+      "width": 2560,
+      "height": 1440,
+      "rotate": 0
+    },
+    "premiere": null,
+    "teenage_mode": 0,
+    "is_chargeable_season": false,
+    "is_story": false,
+    "is_upower_exclusive": false,
+    "is_upower_play": false,
+    "is_upower_preview": false,
+    "enable_vt": 0,
+    "vt_display": "",
+    "is_upower_exclusive_with_qa": false,
+    "is_hua_sheng": false,
+    "no_cache": false,
+    "pages": [
+      {
+        "cid": 36010133667,
+        "page": 1,
+        "from": "vupload",
+        "part": "【课前篇】Python从0到1学习指南",
+        "duration": 164,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2560,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i0.hdslb.com/bfs/storyff/_000039vih1y8p1hep1yc55t3jkp7hib_firsti.jpg",
+        "ctime": 1770889219,
+        "asr_language": "cmn"
+      },
+      {
+        "cid": 500001658674168,
+        "page": 2,
+        "from": "vupload",
+        "part": "【语法基础】Python、PyCharm的安装与相关配置",
+        "duration": 2503,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2560,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i2.hdslb.com/bfs/storyff/n240822sa2uok66lh70sn244isoj9ls4_firsti.jpg",
+        "ctime": 1724340329
+      },
+      {
+        "cid": 500001657139640,
+        "page": 3,
+        "from": "vupload",
+        "part": "【语法基础】了解Python，并编写第一个程序，常见的bug",
+        "duration": 1746,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2646,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i2.hdslb.com/bfs/storyff/n240821sa19oc3jil809cy2yepoitijo_firsti.jpg",
+        "ctime": 1724338759
+      },
+      {
+        "cid": 500001657139598,
+        "page": 4,
+        "from": "vupload",
+        "part": "【语法基础】debug、注释与输出函数",
+        "duration": 1642,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2646,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i1.hdslb.com/bfs/storyff/n240821sa29fn6ec6022rx3jrzytpsqw_firsti.jpg",
+        "ctime": 1724338759
+      },
+      {
+        "cid": 500001657139875,
+        "page": 5,
+        "from": "vupload",
+        "part": "【语法基础】变量与标识符",
+        "duration": 1706,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2686,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i2.hdslb.com/bfs/storyff/n240821sa1jvnx69j4tqiv3m74vap5by_firsti.jpg",
+        "ctime": 1724338759
+      },
+      {
+        "cid": 500001657139713,
+        "page": 6,
+        "from": "vupload",
+        "part": "【语法基础】数值类型、字符串与格式化输出",
+        "duration": 1921,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2686,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i2.hdslb.com/bfs/storyff/n240821sa38gtmefmo6teb2sms66xws4_firsti.jpg",
+        "ctime": 1724338759
+      },
+      {
+        "cid": 500001657142303,
+        "page": 7,
+        "from": "vupload",
+        "part": "【语法基础】算数与赋值运算符、输入函数与转义字符",
+        "duration": 2302,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2662,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i0.hdslb.com/bfs/storyff/n240821sa3rfy4krit3uaqpjnth3mh16_firsti.jpg",
+        "ctime": 1724338759
+      },
+      {
+        "cid": 500001657142759,
+        "page": 8,
+        "from": "vupload",
+        "part": "【语法基础】if判断、比较运算符与逻辑运算符",
+        "duration": 1608,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2656,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i2.hdslb.com/bfs/storyff/n240821sa31uxfdv60gx5a13d1lmqfri_firsti.jpg",
+        "ctime": 1724338759
+      },
+      {
+        "cid": 500001657143247,
+        "page": 9,
+        "from": "vupload",
+        "part": "【语法基础】if-else、if-elif与if嵌套",
+        "duration": 1546,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2656,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i2.hdslb.com/bfs/storyff/n240821sa1ux8ynah4t7octr5o2s6ze5_firsti.jpg",
+        "ctime": 1724338759
+      },
+      {
+        "cid": 500001657143978,
+        "page": 10,
+        "from": "vupload",
+        "part": "【语法基础】while循环与循环嵌套",
+        "duration": 1779,
+        "vid": "",
+        "weblink": "",
+        "dimension": {
+          "width": 2662,
+          "height": 1440,
+          "rotate": 0
+        },
+        "first_frame": "http://i1.hdslb.com/bfs/storyff/n240821sa1oqtl21nbhlyrmn96n3phvl_firsti.jpg",
+        "ctime": 1724338759
+      }
+    ],
+    "subtitle": {
+      "allow_submit": false,
+      "list": []
+    },
+    "is_season_display": false,
+    "user_garb": {
+      "url_image_ani_cut": ""
+    },
+    "honor_reply": {},
+    "like_icon": "",
+    "need_jump_bv": false,
+    "disable_show_up_info": false,
+    "is_story_play": 0,
+    "is_view_self": false
+  }
+}

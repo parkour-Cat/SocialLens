@@ -6,7 +6,7 @@ Usage:
 
 Runs search_posts (2 pages), derives a post id and a user id from the search result with a
 platform-specific finder, then get_post, get_comments (2 pages), get_user, get_user_posts
-(2 pages), search_users and get_feed (2 pages). Saves to backend/tests/fixtures/<platform>/.
+(2 pages), search_users and get_feed (2 pages). Saves to backend/tests/fixtures_raw/<platform>/.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def main() -> None:
     ap.add_argument("--anonymous", action="store_true", help="pass allow_anonymous (platform without a login requirement)")
     args = ap.parse_args()
     platform = args.platform
-    fixtures = REPO / "backend" / "tests" / "fixtures" / platform
+    fixtures = REPO / "backend" / "tests" / "fixtures_raw" / platform
     find_post, find_user = FINDERS.get(platform, (lambda raw: None, lambda raw: None))
 
     def run(action: str, params: dict) -> dict | None:

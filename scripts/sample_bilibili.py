@@ -1,7 +1,7 @@
 """Record real B 站 responses as parser fixtures.
 
 Runs each platform action through the running backend + a real extension in Playwright
-Chromium (anonymous profile) and saves the raw payload to backend/tests/fixtures/bilibili/.
+Chromium (anonymous profile) and saves the raw payload to backend/tests/fixtures_raw/bilibili/.
 Re-run whenever the platform changes shape.
 
 Usage: backend running, extension built, then
@@ -25,7 +25,7 @@ from playwright.sync_api import sync_playwright
 
 REPO = Path(__file__).resolve().parent.parent
 EXT_DIST = REPO / "extension" / "dist"
-FIXTURES = REPO / "backend" / "tests" / "fixtures" / "bilibili"
+FIXTURES = REPO / "backend" / "tests" / "fixtures_raw" / "bilibili"
 BACKEND = os.environ.get("SOCIALLENS_URL", "http://127.0.0.1:17800")
 
 # Ids for the detail actions are taken from the live search result so they always exist.
