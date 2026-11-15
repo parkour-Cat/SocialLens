@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import logging.handlers
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,7 +41,7 @@ def get_logger(name: str) -> ExtraAdapter:
     return ExtraAdapter(logging.getLogger(name), {})
 
 
-def setup_logging(level: str, logs_dir: Path) -> None:
+def setup_logging(level: str, logs_dir: Path, max_mb: float = 10.0, backups: int = 3) -> None:
     root = logging.getLogger()
     root.setLevel(level.upper())
     for h in list(root.handlers):
@@ -52,7 +53,7 @@ def setup_logging(level: str, logs_dir: Path) -> None:
     root.addHandler(stream)
 
     logs_dir.mkdir(parents=True, exist_ok=True)
-    file = logging.FileHandler(logs_dir / "backend.log", encoding="utf-8")
+    file = logging.handlers.RotatingFileHandler(logs_dir / "backend.log", maxBytes=int(max_mb * 1024 * 1024), backupCount=backups, encoding="utf-8")
     file.setFormatter(fmt)
     root.addHandler(file)
 

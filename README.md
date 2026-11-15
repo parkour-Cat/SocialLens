@@ -106,7 +106,7 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 
 - **搜索**：顶部一条命令栏，选平台、动作、参数，"一页"或"连续到 N 条"；⌘ / Ctrl + 点击平台可同时搜多个平台，结果按平台分组。输入框里直接粘帖子或用户链接也能识别。结果可在表格和卡片之间切换（小红书、抖音这类图片为主的平台默认卡片），评论按楼层展示。快捷键：`/` 聚焦输入框，`j` `k` 上下，`o` 打开详情，`t` 切换表格 / 卡片。
 - **详情抽屉**：按内容类型排版（视频、图文轮播、长文、推文卡片），正文里的链接、@用户、#话题 都能点；有评论 tab、作者主页和 TA 的帖子、指标变化、媒体下载和原始 JSON，可展开成全宽详情页。不新开页面就能拿到的平台会自动补全详情，需要新开页面的平台点一下才补全，避免多占配额。
-- **数据**：查询记录和本地缓存（帖子、用户、评论），可按平台浏览、导出 JSON / CSV，历史查询可一键重新打开。
+- **数据**：查询记录和本地缓存（帖子、用户、评论），可按平台浏览、导出 JSON / CSV，历史查询可一键重新打开。「存储」分页显示各类数据占了多少空间，可以按保留策略清理或单独清空某一类。
 - **任务**：连续拉取、下载和普通任务放在一起，按进行中 / 已完成 / 失败分组，带进度和取消；在这里新建下载。
 - **状态**：风控暂停、探测失败、扩展掉线等告警在最上面，可一键恢复；每个平台一块砖，显示登录状态、页面加载配额和探测结果；下面是风控事件记录。
 - **接口**：各平台能力矩阵（悬停平台图标看该平台说明）、从 OpenAPI 生成的 REST 列表（带 curl 示例，GET 可直接试）、MCP 的 tool 列表和接入命令。
@@ -140,6 +140,8 @@ curl "http://127.0.0.1:17800/api/v1/bilibili/search?keyword=露营"
 | GET | `/api/v1/tasks/{id}` | 任务状态、结果、进度 |
 | POST | `/api/v1/{platform}/resume` | 清除风控导致的队列暂停 |
 | GET | `/api/v1/items?kind=&platform=` | 浏览本地缓存 |
+| GET | `/api/v1/storage` | 各类数据的占用和保留策略 |
+| POST | `/api/v1/storage/prune` | 清理旧数据：不带参数按保留策略；`{"older_than_days": {"items": 90}}` 指定目标和天数，0 表示全部 |
 
 ```bash
 # 连续拉取 300 条搜索结果并等待完成
@@ -182,6 +184,20 @@ tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform �
 文件落在 `data/downloads/{platform}/{作者 id}/{帖子 id}_{序号}.{ext}`。B 站有 ffmpeg 时取 DASH 最高画质并合并音视频；Reddit 视频的音轨单独合并；头条视频只取最高画质；YouTube 和 TikTok 交给 yt-dlp。
 
 后端下载和 yt-dlp 默认沿用系统代理（环境变量 `HTTPS_PROXY`，否则读 Windows / macOS 的系统代理设置），和浏览器走同一条线路。`SOCIALLENS_DOWNLOAD_PROXY=off` 关掉，或直接填一个代理地址。
+
+## 数据保留
+
+后端每 24 小时按保留策略清理一次（`SOCIALLENS_PRUNE_INTERVAL_H`，0 关闭）。默认只清理会无限增长、又不是你要看的东西：
+
+| 数据 | 默认保留 | 环境变量 |
+|---|---|---|
+| 已结束的任务（每条带完整结果，结果里的条目已另存进缓存） | 30 天 | `SOCIALLENS_RETAIN_TASKS_DAYS` |
+| 平台探测记录 | 30 天 | `SOCIALLENS_RETAIN_HEALTH_DAYS` |
+| 录制样本 `raw/` | 30 天 | `SOCIALLENS_RETAIN_RAW_DAYS` |
+| 下载临时分片 `uploads/` | 1 天 | `SOCIALLENS_RETAIN_UPLOADS_DAYS` |
+| 缓存的帖子 / 用户 / 评论、查询记录、指标快照、风控事件 | 一直保留 | `SOCIALLENS_RETAIN_{ITEMS,QUERIES,SNAPSHOTS,RISK_EVENTS}_DAYS` |
+
+0 表示一直保留。下载的媒体文件永远不会被自动删除。`backend.log` 满 10 MB 轮转，保留 3 个旧文件（`SOCIALLENS_LOG_MAX_MB`、`SOCIALLENS_LOG_BACKUPS`）。
 
 ## 安全边界
 

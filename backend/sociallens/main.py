@@ -26,6 +26,7 @@ from .security import LocalOnlyMiddleware
 from .platforms.registry import build_registry
 from .storage.db import Database
 from .storage.raw import RawStore
+from .storage.retention import RetentionManager
 from .tasks.manager import TaskManager
 from .ws.hub import ExtensionHub
 
@@ -35,7 +36,7 @@ log = get_logger("app")
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     settings.ensure_dirs()
-    setup_logging(settings.log_level, settings.logs_dir)
+    setup_logging(settings.log_level, settings.logs_dir, settings.log_max_mb, settings.log_backups)
     token = settings.load_or_create_token()
 
     registry = build_registry()
@@ -46,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     downloads = DownloadManager(settings.downloads_dir, registry, tasks, proxy=settings.download_proxy)
     collects = CollectManager(registry, tasks, db)
     health_mgr = HealthManager(registry, tasks, hub, db, settings.health_interval_min)
+    retention = RetentionManager(settings, db)
 
     async def on_capture(msg: dict[str, Any]) -> None:
         platform = msg.get("platform") or "unknown"
@@ -59,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         await tasks.start()
         await health_mgr.start()
+        await retention.start()
         log.info(
             "sociallens backend started",
             version=__version__,
@@ -73,13 +76,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
+            await retention.stop()
             await health_mgr.stop()
             await tasks.stop()
             db.close()
 
     app = FastAPI(title="SocialLens", version=__version__, lifespan=lifespan)
     app.add_middleware(LocalOnlyMiddleware, allowed_hosts=settings.allowed_host_names, trusted_origins=settings.allowed_origins)
-    app.state.sl = AppState(settings, token, registry, db, raw, hub, tasks, downloads, collects, health_mgr)
+    app.state.sl = AppState(settings, token, registry, db, raw, hub, tasks, downloads, collects, health_mgr, retention)
 
     @app.exception_handler(SocialLensError)
     async def _sl_error(_: Request, exc: SocialLensError):

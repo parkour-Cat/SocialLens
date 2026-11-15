@@ -50,6 +50,22 @@ class Settings(BaseSettings):
     ws_heartbeat_s: float = 20.0
     ws_auth_timeout_s: float = 5.0
 
+    # Retention in days per target, 0 = keep forever (see storage/retention.py). Pruned every
+    # prune_interval_h hours (0 disables the schedule; POST /storage/prune still works).
+    # Downloaded media is never pruned.
+    retain_tasks_days: float = 30.0  # finished tasks only; their items stay in the cache
+    retain_health_days: float = 30.0
+    retain_raw_days: float = 30.0  # record-mode captures
+    retain_uploads_days: float = 1.0  # chunks left by interrupted downloads
+    retain_risk_events_days: float = 0.0
+    retain_queries_days: float = 0.0
+    retain_snapshots_days: float = 0.0
+    retain_items_days: float = 0.0
+    prune_interval_h: float = 24.0
+    # backend.log rotates at this size, keeping this many old files
+    log_max_mb: float = 10.0
+    log_backups: int = 3
+
     # Host header values the API answers to (see security.py). Loopback names are always allowed;
     # add more (comma separated) only if you reach the backend under another name on purpose.
     allowed_hosts: str = ""

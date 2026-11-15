@@ -1,6 +1,7 @@
 // 数据 (query history + local cache) and 任务 (collects, downloads, page tasks) pages.
 import { $, esc, J, fmtN, fmtT, fmtB, api, toast, on, act, S, store, plat, pname, logo, actionName, statusPill, taskSummary, isDebugTask, isActive, go, hashFor, exportJSON, exportCSV, IC } from "./core.js";
 import { renderList, viewOf, viewSeg, setView } from "./results.js";
+import { Z } from "./i18n.js";
 
 const platOptions = (v, all = "全部平台") => `<option value="">${all}</option>` + S.platforms.map((p) => `<option value="${p.id}" ${p.id === v ? "selected" : ""}>${esc(p.name)}</option>`).join("");
 const head = (eyebrow, title, stats = "") => `<div class="ph"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1></div><div class="stats">${stats}</div></div>`;
@@ -11,9 +12,9 @@ const SOURCE_NAME = { api: "接口调用", multi_search: "多平台搜索", coll
 export function showData(q) {
   if (q) { DK.k = q.get("k") || DK.k; DK.p = q.get("p") ?? DK.p; DK.q = q.get("q") ?? DK.q; DK.n = Number(q.get("n")) || DK.n; DK.s = q.get("s") ?? ""; }
   $("main").innerHTML = `<div class="wrap">${head("DATA", "数据", `<span>查过的查询、帖子、用户、评论都存在本地 SQLite</span>`)}
-    <div class="cmd"><div class="frow"><div class="seg">${[["queries", "查询记录"], ["posts", "帖子"], ["users", "用户"], ["comments", "评论"]].map(([k, n]) => `<button class="${DK.k === k ? "on" : ""}" data-act="dKind" data-arg='${J(k)}'>${n}</button>`).join("")}</div>
-    <select id="d-platform" class="field w160">${platOptions(DK.p)}</select>
-    ${DK.k === "queries" ? `<div class="kw">${IC.search}<input id="d-q" class="field" value="${esc(DK.q)}" placeholder="关键词 / id" autocomplete="off"><kbd>/</kbd></div>` : `<select id="d-src" class="field" style="min-width:220px;max-width:420px" title="只看某次查询抓到的"><option value="">来源：全部缓存</option></select><label class="inl faint" ${DK.s ? "hidden" : ""}>最多<input id="d-n" class="field w80" type="number" min="1" max="1000" value="${DK.n}">条</label><span class="sp"></span>`}
+    <div class="cmd"><div class="frow"><div class="seg">${[["queries", "查询记录"], ["posts", "帖子"], ["users", "用户"], ["comments", "评论"], ["storage", Z("存储", "Storage")]].map(([k, n]) => `<button class="${DK.k === k ? "on" : ""}" data-act="dKind" data-arg='${J(k)}'>${n}</button>`).join("")}</div>
+    ${DK.k === "storage" ? `<span class="sp"></span>` : `<select id="d-platform" class="field w160">${platOptions(DK.p)}</select>`}
+    ${DK.k === "storage" ? "" : DK.k === "queries" ? `<div class="kw">${IC.search}<input id="d-q" class="field" value="${esc(DK.q)}" placeholder="关键词 / id" autocomplete="off"><kbd>/</kbd></div>` : `<select id="d-src" class="field" style="min-width:220px;max-width:420px" title="只看某次查询抓到的"><option value="">来源：全部缓存</option></select><label class="inl faint" ${DK.s ? "hidden" : ""}>最多<input id="d-n" class="field w80" type="number" min="1" max="1000" value="${DK.n}">条</label><span class="sp"></span>`}
     <button class="btn" data-act="dLoad">刷新</button></div></div>
     <div id="d-out"><section class="res"><div class="rbusy"><span class="spin"></span>加载中…</div></section></div></div>`;
   loadData();
@@ -28,6 +29,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.
 async function loadData() {
   const out = $("d-out"); if (!out) return;
   try {
+    if (DK.k === "storage") return await loadStorage(out);
     if (DK.k === "queries") {
       const q = new URLSearchParams({ limit: "200" }); if (DK.p) q.set("platform", DK.p); if (DK.q.trim()) q.set("q", DK.q.trim());
       const rows = (await api("/queries?" + q)).data;
@@ -51,6 +53,49 @@ on("dExport", (f) => (f === "csv" ? exportCSV : exportJSON)(dItems, "cache"));
 on("dOpen", async (id) => {
   try { const q = (await api(`/queries/${id}`)).data; act("showResult", { pid: q.platform, action: q.action, params: q.params || {}, items: q.items, kind: q.kind, source: `历史 #${q.id}`, at: Date.parse(q.at) }); }
   catch (e) { toast(e.message, true); }
+});
+
+// ---- 数据 › 存储 ----------------------------------------------------------------------------------------
+const STORE_ROWS = [
+  ["tasks", Z("已结束的任务", "Finished tasks"), Z("每条都带完整结果，结果里的条目已另存进缓存", "each keeps its full result; its items are in the cache too")],
+  ["health", Z("平台探测记录", "Platform probes"), ""],
+  ["risk_events", Z("风控事件", "Risk-control hits"), ""],
+  ["queries", Z("查询记录", "Query history"), ""],
+  ["snapshots", Z("指标快照", "Metric snapshots"), Z("指标每次变化存一份", "one per metric change")],
+  ["items", Z("缓存的帖子、用户、评论", "Cached posts, users, comments"), ""],
+  ["raw", Z("录制样本", "Recorded captures"), Z("录制模式存下的原始响应", "raw responses saved by record mode")],
+  ["uploads", Z("下载临时分片", "Download chunks"), Z("中断的下载留下的", "left by interrupted downloads")],
+];
+const STORE_NAME = Object.fromEntries(STORE_ROWS.map(([k, n]) => [k, n]));
+const keepText = (d) => (d > 0 ? Z(`保留 ${d} 天`, `keep ${d} days`) : Z("一直保留", "kept"));
+const pruneSummary = (r) => {
+  const rows = Object.entries(r.removed).filter(([k]) => k !== "raw" && k !== "uploads").reduce((a, [, n]) => a + n, 0);
+  const files = (r.removed.raw || 0) + (r.removed.uploads || 0);
+  return Z(`删除 ${fmtN(rows)} 条记录、${fmtN(files)} 个文件；数据库 ${fmtB(r.db_bytes_before)} → ${fmtB(r.db_bytes_after)}`, `removed ${fmtN(rows)} rows and ${fmtN(files)} files; database ${fmtB(r.db_bytes_before)} → ${fmtB(r.db_bytes_after)}`);
+};
+async function loadStorage(out) {
+  const u = (await api("/storage")).data;
+  const cell = (k) => {
+    const t = u.tables[k], d = u.dirs[k];
+    return t ? { n: t.rows, count: Z(`${fmtN(t.rows)} 条`, `${fmtN(t.rows)} rows`), size: "≈ " + fmtB(t.bytes), oldest: t.oldest ? fmtT(t.oldest) : "–" }
+      : { n: d.files, count: Z(`${fmtN(d.files)} 个文件`, `${fmtN(d.files)} files`), size: fmtB(d.bytes), oldest: "–" };
+  };
+  const row = ([k, name, note]) => { const c = cell(k); return `<tr><td><div class="strong">${esc(name)}</div>${note ? `<div class="faint">${esc(note)}</div>` : ""}</td><td class="r num">${c.count}</td><td class="r num">${c.size}</td><td class="r mono faint">${esc(c.oldest)}</td><td><span class="pill ${u.policy[k] > 0 ? "accent" : ""}">${keepText(u.policy[k])}</span></td><td class="r"><button class="btn ghost sm" data-act="sClear" data-arg='${J(k)}' ${c.n ? "" : "disabled"}>${Z("清空", "Clear")}</button></td></tr>`; };
+  const fixed = [[Z("下载的媒体", "Downloaded media"), u.dirs.downloads, Z("不会自动清理，需要的话自己删文件", "never pruned; delete files yourself if needed")], [Z("日志", "Logs"), u.dirs.logs, Z("按大小自动轮转", "rotated by size")]]
+    .map(([name, d, note]) => `<tr><td><div class="strong">${esc(name)}</div><div class="faint">${esc(note)}</div></td><td class="r num">${Z(`${fmtN(d.files)} 个文件`, `${fmtN(d.files)} files`)}</td><td class="r num">${fmtB(d.bytes)}</td><td class="r faint">–</td><td></td><td></td></tr>`).join("");
+  const last = u.last_prune ? Z(`上次清理：${fmtT(u.last_prune.at)}，${pruneSummary(u.last_prune)}`, `Last prune: ${fmtT(u.last_prune.at)}, ${pruneSummary(u.last_prune)}`) : Z("本次启动后还没清理过", "Not pruned since the backend started");
+  const sched = u.prune_interval_h > 0 ? Z(`每 ${u.prune_interval_h} 小时按保留策略自动清理一次`, `pruned by the policy every ${u.prune_interval_h} h`) : Z("定时清理已关闭", "scheduled pruning is off");
+  out.innerHTML = `<section class="res"><div class="rh"><b>${Z("存储", "Storage")}</b><span class="faint mono">${esc(u.data_dir)}</span><span class="faint">${Z("数据库", "database")} ${fmtB(u.db.bytes)}</span><span class="sp"></span><button class="btn sm" data-act="sPrune">${Z("按保留策略清理", "Prune by policy")}</button></div>
+    <div class="tablewrap"><table class="tbl"><thead><tr><th></th><th class="r">${Z("数量", "Count")}</th><th class="r">${Z("大小", "Size")}</th><th class="r">${Z("最早", "Oldest")}</th><th>${Z("保留策略", "Retention")}</th><th></th></tr></thead><tbody>${STORE_ROWS.map(row).join("")}${fixed}</tbody></table></div>
+    <div class="note faint" style="padding:10px 16px">${esc(sched)} · ${esc(last)}。${Z("保留天数用环境变量 SOCIALLENS_RETAIN_*_DAYS 设置，0 表示一直保留。", "Set retention with SOCIALLENS_RETAIN_*_DAYS environment variables; 0 keeps forever.")}</div></section>`;
+}
+on("sPrune", async () => {
+  try { const r = (await api("/storage/prune", { method: "POST", body: "{}" })).data; toast(pruneSummary(r)); loadData(); } catch (e) { toast(e.message, true); }
+});
+on("sClear", async (k) => {
+  const what = k === "tasks" ? Z("全部已结束的任务（进行中的不受影响）", "all finished tasks (running ones are kept)") : Z(`全部「${STORE_NAME[k]}」`, `all ${STORE_NAME[k]}`);
+  if (!confirm(Z(`删除${what}？删除后无法恢复。`, `Delete ${what}? This cannot be undone.`))) return;
+  try { const r = (await api("/storage/prune", { method: "POST", body: JSON.stringify({ older_than_days: { [k]: 0 } }) })).data; toast(pruneSummary(r)); loadData(); } catch (e) { toast(e.message, true); }
 });
 
 // ---- 任务 ---------------------------------------------------------------------------------------------

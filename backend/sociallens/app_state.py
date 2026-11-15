@@ -11,6 +11,7 @@ from .health import HealthManager
 from .platforms.registry import PlatformRegistry
 from .storage.db import Database
 from .storage.raw import RawStore
+from .storage.retention import RetentionManager
 from .tasks.manager import TaskManager
 from .ws.hub import ExtensionHub
 
@@ -27,3 +28,4 @@ class AppState:
     downloads: DownloadManager
     collects: CollectManager
     health: HealthManager
+    retention: RetentionManager

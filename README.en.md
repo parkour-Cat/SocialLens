@@ -106,7 +106,7 @@ Open http://127.0.0.1:17800/ once the backend runs. Static files and native ES m
 
 - **Search**: one command bar for platform, action and parameters, in "one page" or "up to N items" mode; cmd / ctrl + click a platform to search several at once, with results grouped per platform. Pasted post or user links are resolved. Results switch between a table and cards (image-first sites such as Xiaohongshu and Douyin default to cards); comments render as threads. Keys: `/` focus the input, `j` `k` move, `o` open, `t` table / cards.
 - **Detail drawer**: laid out per content type (video, image carousel, long article, tweet card); links, @mentions and #topics in the text are clickable. Tabs for comments, the author's profile and posts, metric history, media downloads and raw JSON; expands to a full page. Platforms that can fetch the full detail without opening a page do so automatically; the ones that need a page load wait for a click, to save the page-load budget.
-- **Data**: query history and the local cache (posts, users, comments), browsable by platform and exportable as JSON / CSV; any past query reopens in one click.
+- **Data**: query history and the local cache (posts, users, comments), browsable by platform and exportable as JSON / CSV; any past query reopens in one click. The Storage tab shows how much space each kind of data takes, and prunes by the policy or clears one kind on demand.
 - **Tasks**: collects, downloads and other tasks in one list, grouped as running / finished / failed, with progress and cancel; new downloads start here.
 - **Status**: alerts first (paused queues with one-click resume, failing probes, extension offline), then one tile per platform with login state, page-load budget and probe result, then the risk-control log.
 - **API**: the capability matrix (hover a platform icon for its notes), the REST list generated from OpenAPI with curl examples (GET endpoints can be tried in place), and the MCP tool list with the connect command.
@@ -140,6 +140,8 @@ Every response is `{"success": true, "data": ...}` or `{"success": false, "error
 | GET | `/api/v1/tasks/{id}` | task state, result, progress |
 | POST | `/api/v1/{platform}/resume` | clear a pause caused by risk control |
 | GET | `/api/v1/items?kind=&platform=` | browse the local cache |
+| GET | `/api/v1/storage` | disk usage per kind of data, and the retention policy |
+| POST | `/api/v1/storage/prune` | prune old data: no body applies the retention policy; `{"older_than_days": {"items": 90}}` picks targets and days, 0 means everything |
 
 ```bash
 # collect 300 search results and wait for completion
@@ -182,6 +184,20 @@ Tools: `status`, `list_platforms`, `get_capabilities`, `search` (pass comma-sepa
 Files land in `data/downloads/{platform}/{author id}/{post id}_{index}.{ext}`. Bilibili takes the best DASH quality and merges audio and video when ffmpeg is available; Reddit's separate audio track is merged; Toutiao takes the best quality only; YouTube and TikTok go through yt-dlp.
 
 Downloads and yt-dlp follow the system proxy by default (`HTTPS_PROXY`, otherwise the Windows / macOS proxy settings), so they use the same route as the browser. `SOCIALLENS_DOWNLOAD_PROXY=off` disables it; a proxy url overrides it.
+
+## Data retention
+
+The backend prunes by its retention policy every 24 hours (`SOCIALLENS_PRUNE_INTERVAL_H`, 0 disables). By default it only prunes what grows without bound and is not something you browse:
+
+| Data | Kept by default | Environment variable |
+|---|---|---|
+| Finished tasks (each keeps its full result; the items are in the cache too) | 30 days | `SOCIALLENS_RETAIN_TASKS_DAYS` |
+| Platform probe log | 30 days | `SOCIALLENS_RETAIN_HEALTH_DAYS` |
+| Recorded captures `raw/` | 30 days | `SOCIALLENS_RETAIN_RAW_DAYS` |
+| Download chunks `uploads/` | 1 day | `SOCIALLENS_RETAIN_UPLOADS_DAYS` |
+| Cached posts / users / comments, query history, metric snapshots, risk-control hits | forever | `SOCIALLENS_RETAIN_{ITEMS,QUERIES,SNAPSHOTS,RISK_EVENTS}_DAYS` |
+
+0 keeps forever. Downloaded media is never deleted automatically. `backend.log` rotates at 10 MB and keeps 3 old files (`SOCIALLENS_LOG_MAX_MB`, `SOCIALLENS_LOG_BACKUPS`).
 
 ## Boundaries
 
