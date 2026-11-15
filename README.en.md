@@ -4,7 +4,7 @@
 
 # SocialLens
 
-**Turn the social media accounts you are already signed in to in your browser into a local API.**
+**Let your AI see the social media you can see.**
 
 [中文](README.md) | English
 
@@ -12,11 +12,33 @@
 
 </div>
 
-A Chrome extension intercepts and executes each site's own requests inside your signed-in tabs and hands the data to a local FastAPI backend. The backend serves a unified REST API, an MCP server and a web console on `127.0.0.1:17800`. No platform API keys, and the backend never touches your credentials.
+Ask Claude, Cursor or any MCP client to "analyse the comments under this video", and it goes to YouTube, X, Reddit, TikTok, Instagram, Bilibili, Xiaohongshu and 7 more platforms itself: searching, reading comments, opening profiles, through the accounts you are already signed in to in your browser. You can also click around in the local web console, or call it as a REST API from your own scripts. No platform API keys, and your credentials never leave the browser.
+
+<!-- demo GIF goes here: analyze_comments running in Claude -->
 
 ![Console: search page with the detail drawer](docs/assets/console-query.en.png)
 
 > For personal use only: your own accounts, the content you can already see. The project does no captcha solving, no risk-control evasion and no login automation. When a site shows a captcha, the task fails and the queue pauses until you handle it yourself.
+
+## Analyse a comment section in one line
+
+Once installed (see [Quick start](#quick-start)), type in Claude Code:
+
+```
+/mcp__sociallens__analyze_comments youtube VIDEO_ID
+```
+
+or just say "look at the comments under this video, what is the audience talking about?". Claude calls `comment_digest` to fetch up to 200 comments (paged for it, text, likes and time only) and writes an analysis with a fixed structure:
+
+> - **Sample**: how many comments it read out of the total, over what period, and whether a few comments hold most of the likes
+> - **Overall reception**: roughly how positive, negative and neutral, and how sure it is
+> - **Main themes**: three to six, each with one or two verbatim quotes and their like counts
+> - **Audience questions**: what people ask the author or want to see next
+> - **Disagreements**: where opinions split, and what each side says
+
+It quotes real comments verbatim, never invents any, and leaves commenters' names out. Use another platform id (`bilibili`, `xiaohongshu`, `x`, `reddit`, ...) and post id for other platforms.
+
+Beyond comments, the same tools let an AI search one topic across platforms, check what an account posted lately, follow how a few posts' numbers move, and export results to Excel for you.
 
 ## What it is for
 
@@ -36,6 +58,8 @@ A Chrome extension intercepts and executes each site's own requests inside your 
 - Commercial use (see [License](#license)).
 
 ## How it works
+
+A Chrome extension intercepts and executes each site's own requests inside your signed-in tabs and hands the data to a local FastAPI backend. The backend serves a unified REST API, an MCP server and a web console on `127.0.0.1:17800`, and never touches your credentials.
 
 ![Architecture](docs/assets/architecture.en.png)
 
