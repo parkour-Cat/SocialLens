@@ -6,6 +6,7 @@ import secrets
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .security import LOOPBACK_HOSTS
@@ -14,12 +15,20 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
 
+def default_data_dir() -> Path:
+    """<repo>/data when running from a source checkout; ~/.sociallens when installed as a package
+    (uvx / pip), where the package dir is a disposable environment that upgrades wipe."""
+    if (BACKEND_DIR / "pyproject.toml").is_file() and (REPO_DIR / "extension").is_dir():
+        return REPO_DIR / "data"
+    return Path.home() / ".sociallens"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SOCIALLENS_", env_file=".env", extra="ignore")
 
     host: str = "127.0.0.1"
     port: int = 17800
-    data_dir: Path = REPO_DIR / "data"
+    data_dir: Path = Field(default_factory=default_data_dir)
     # Proxy for backend downloads and yt-dlp. "system" (default) mirrors what the browser uses:
     # HTTPS_PROXY/HTTP_PROXY env, else the Windows/macOS system proxy. "off" disables, or give a URL.
     download_proxy: str = "system"

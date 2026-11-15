@@ -59,6 +59,20 @@ Platform notes:
 
 ## Quick start
 
+### Option 1: no build (just uv and Chrome)
+
+1. Install [uv](https://docs.astral.sh/uv/), then start the backend straight away (uv fetches Python 3.12 and the dependencies):
+
+   ```bash
+   uvx --from "git+https://github.com/parkour-Cat/SocialLens#subdirectory=backend" sociallens
+   ```
+
+   For YouTube / TikTok video downloads, use `--from "sociallens[download] @ git+https://github.com/parkour-Cat/SocialLens#subdirectory=backend"` instead. To pin a version, append a tag such as `@v0.1.0` to the repository URL. Data lives in `~/.sociallens/`.
+2. Download the latest `sociallens-extension-*.zip` from [Releases](https://github.com/parkour-Cat/SocialLens/releases) and unzip it.
+3. Continue with step 3 below, picking the unzipped folder under "Load unpacked".
+
+### Option 2: from source
+
 You need Python 3.12 + [uv](https://docs.astral.sh/uv/), Node 20+ + pnpm, and Chrome. Downloads also want ffmpeg on the PATH.
 
 ```bash
@@ -146,6 +160,8 @@ Full parameters and each platform's id formats are on the console's API page and
 # Claude Code
 claude mcp add sociallens -- uv run --project /path/to/SocialLens/backend sociallens-mcp
 ```
+
+If you installed with option 1 (uvx), use `uvx --from "git+https://github.com/parkour-Cat/SocialLens#subdirectory=backend" sociallens-mcp` as the command instead.
 
 ```json
 {

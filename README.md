@@ -59,6 +59,20 @@ Chrome 扩展在你已登录的标签页里拦截和执行站点自己的请求�
 
 ## 快速开始
 
+### 方式一：免构建（只需 uv 和 Chrome）
+
+1. 安装 [uv](https://docs.astral.sh/uv/)，然后直接启动后端（会自动装好 Python 3.12 和依赖）：
+
+   ```bash
+   uvx --from "git+https://github.com/parkour-Cat/SocialLens#subdirectory=backend" sociallens
+   ```
+
+   要下载 YouTube / TikTok 视频，把 `--from` 换成 `"sociallens[download] @ git+https://github.com/parkour-Cat/SocialLens#subdirectory=backend"`。想固定版本，在仓库地址后加 `@v0.1.0` 这样的标签。数据存在 `~/.sociallens/`。
+2. 在 [Releases](https://github.com/parkour-Cat/SocialLens/releases) 下载最新的 `sociallens-extension-*.zip` 并解压。
+3. 接着做下面的第 3 步，「加载已解压的扩展程序」时选解压出来的文件夹。
+
+### 方式二：从源码运行
+
 需要 Python 3.12 + [uv](https://docs.astral.sh/uv/)、Node 20+ + pnpm、Chrome。下载功能另需 ffmpeg 在 PATH 上。
 
 ```bash
@@ -146,6 +160,8 @@ curl -X POST http://127.0.0.1:17800/api/v1/douyin/posts/7663480658576264457/down
 # Claude Code
 claude mcp add sociallens -- uv run --project /path/to/SocialLens/backend sociallens-mcp
 ```
+
+用方式一（uvx）安装的，把命令换成 `uvx --from "git+https://github.com/parkour-Cat/SocialLens#subdirectory=backend" sociallens-mcp`。
 
 ```json
 {
