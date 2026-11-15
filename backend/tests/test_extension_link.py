@@ -65,7 +65,7 @@ def test_extra_extension_ids(tmp_path):
 
     from sociallens.main import create_app
 
-    s = Settings(data_dir=tmp_path / "d", extra_extension_ids="abc, def")
+    s = Settings(data_dir=tmp_path / "d", extra_extension_ids="abc, def", allowed_hosts="testserver")
     with TestClient(create_app(s)) as c:
         with _open(c, origin="chrome-extension://def") as ws:
             _auth(ws)

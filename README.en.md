@@ -170,6 +170,7 @@ Downloads and yt-dlp follow the system proxy by default (`HTTPS_PROXY`, otherwis
 ## Boundaries
 
 - The backend never touches platform credentials; login state lives only in the browser. The backend binds to 127.0.0.1 only.
+- Web pages cannot call the local API: the Host header must be `127.0.0.1` / `localhost` / `[::1]` (blocks DNS rebinding), and under `/api/` browser requests are let through only from the console itself and the extension. Requests started by any other site (a foreign Origin, or `Sec-Fetch-Site` of cross-site / same-site) get 403. curl, MCP and scripts send neither header and are unaffected. To reach the backend under another hostname on purpose, set `SOCIALLENS_ALLOWED_HOSTS=name1,name2`.
 - No captcha solving, no risk-control evasion, no login automation.
 - Ordinary browsing is not recorded; the interception layer only handles traffic triggered by API tasks.
 - Pages the extension opens live in a separate work window; the user's own tabs are never closed.

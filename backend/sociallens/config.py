@@ -8,6 +8,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .security import LOOPBACK_HOSTS
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
 
@@ -38,6 +40,18 @@ class Settings(BaseSettings):
     extra_extension_ids: str = ""  # comma separated, e.g. a dev build with a different ID
     ws_heartbeat_s: float = 20.0
     ws_auth_timeout_s: float = 5.0
+
+    # Host header values the API answers to (see security.py). Loopback names are always allowed;
+    # add more (comma separated) only if you reach the backend under another name on purpose.
+    allowed_hosts: str = ""
+
+    @property
+    def allowed_host_names(self) -> set[str]:
+        extra = {x.strip().lower() for x in self.allowed_hosts.split(",") if x.strip()}
+        bind = self.host.strip().lower()
+        if bind and bind not in ("0.0.0.0", "::"):
+            extra.add(bind)
+        return set(LOOPBACK_HOSTS) | extra
 
     @property
     def allowed_origins(self) -> set[str]:

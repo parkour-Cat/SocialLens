@@ -9,7 +9,8 @@ from sociallens.main import create_app
 
 @pytest.fixture
 def settings(tmp_path):
-    return Settings(data_dir=tmp_path / "data", log_level="DEBUG", ws_heartbeat_s=5.0, download_proxy="off")
+    # TestClient sends Host: testserver
+    return Settings(data_dir=tmp_path / "data", log_level="DEBUG", ws_heartbeat_s=5.0, download_proxy="off", allowed_hosts="testserver")
 
 
 @pytest.fixture

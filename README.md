@@ -170,6 +170,7 @@ tools：`status`、`list_platforms`、`get_capabilities`、`search`（platform �
 ## 安全边界
 
 - 后端永远不接触平台凭证，登录态只在浏览器里；后端只绑定 127.0.0.1。
+- 网页不能调用本地接口：Host 头必须是 `127.0.0.1` / `localhost` / `[::1]`（挡住 DNS 重绑定）；`/api/` 下来自浏览器的请求只放行控制台本身和扩展，其他网站发起的请求（带外站 Origin，或 `Sec-Fetch-Site` 为 cross-site / same-site）一律 403。curl、MCP、脚本不带这些头，不受影响。确实要用别的主机名访问后端时，设 `SOCIALLENS_ALLOWED_HOSTS=名字1,名字2`。
 - 不做验证码识别、风控绕过、登录自动化。
 - 用户平常浏览的数据默认不保存，拦截层只处理 API 任务触发的流量。
 - 扩展自己开的页面在独立的工作窗口里，不关闭用户自己的标签页。

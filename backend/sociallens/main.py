@@ -22,6 +22,7 @@ from .health import HealthManager
 from .config import Settings, get_settings
 from .logging_setup import get_logger, setup_logging
 from .models.errors import ErrorCode, SocialLensError
+from .security import LocalOnlyMiddleware
 from .platforms.registry import build_registry
 from .storage.db import Database
 from .storage.raw import RawStore
@@ -77,6 +78,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             db.close()
 
     app = FastAPI(title="SocialLens", version=__version__, lifespan=lifespan)
+    app.add_middleware(LocalOnlyMiddleware, allowed_hosts=settings.allowed_host_names, trusted_origins=settings.allowed_origins)
     app.state.sl = AppState(settings, token, registry, db, raw, hub, tasks, downloads, collects, health_mgr)
 
     @app.exception_handler(SocialLensError)
